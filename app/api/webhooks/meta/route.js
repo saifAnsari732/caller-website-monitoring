@@ -68,34 +68,66 @@ export async function POST(request) {
       name: body.name || body.full_name || body.sender_name || '',
       mobile: body.mobile || body.phone || body.phone_number || body.sender_mobile || '',
       email: body.email || '',
-      city: body.city || 'Indore',
-      state: body.state || 'Madhya Pradesh',
+      city: body.city || '',
+      state: body.state || 'Uttar Pradesh',
       business_type: body.business_type || 'Distributor',
       product_interest: body.product_interest || body.subject || 'Mustard Oil (15L Tin)',
       formId: body.formId || body.form_id || '',
-      providerId: body.providerId || sourceParam || '',
-      lead_source: body.lead_source || '',
-      campaign_name: body.campaign_name || ''
+      lead_source: 'Facebook Meta Lead Ads',
+      campaign_name: body.campaign_name || '',
+      metaLeadId: '',
+      inbox_url: ''
     };
 
-    if (Array.isArray(body.entry) && body.entry[0]?.changes?.[0]?.value) {
-      const val = body.entry[0].changes[0].value;
-      extracted.formId = val.form_id || extracted.formId;
-      if (Array.isArray(val.field_data)) {
-        for (const f of val.field_data) {
-          const v = Array.isArray(f.values) ? f.values[0] : '';
-          if (f.name === 'full_name' || f.name.includes('name')) extracted.name = v;
-          if (f.name === 'phone_number' || f.name.includes('phone')) extracted.mobile = v;
-          if (f.name === 'city') extracted.city = v;
-          if (f.name === 'state') extracted.state = v;
-          if (f.name === 'email') extracted.email = v;
+    const token = process.env.META_PAGE_ACCESS_TOKEN || process.env.META_USER_ACCESS_TOKEN || settings.metaConfig?.accessToken || '';
+
+    // Handle incoming Meta Graph API Webhook payload
+    if (Array.isArray(body.entry)) {
+      for (const entry of body.entry) {
+        for (const change of (entry.changes || [])) {
+          if (change.value) {
+            const val = change.value;
+            extracted.formId = val.form_id || extracted.formId;
+            extracted.metaLeadId = val.leadgen_id ? String(val.leadgen_id) : extracted.metaLeadId;
+
+            // If leadgen_id is provided, query Meta Graph API for full form answers
+            if (extracted.metaLeadId && token) {
+              try {
+                const leadRes = await fetch(`https://graph.facebook.com/v21.0/${extracted.metaLeadId}?access_token=${token}`);
+                const leadData = await leadRes.json();
+                if (Array.isArray(leadData?.field_data)) {
+                  for (const f of leadData.field_data) {
+                    const v = Array.isArray(f.values) && f.values.length > 0 ? f.values[0] : '';
+                    const k = (f.name || '').toLowerCase();
+                    if (k.includes('name') && !k.includes('company')) extracted.name = v;
+                    else if (k.includes('phone') || k.includes('mobile')) extracted.mobile = v;
+                    else if (k.includes('email')) extracted.email = v;
+                    else if (k.includes('city')) extracted.city = v;
+                    else if (k.includes('state')) extracted.state = v;
+                    else if (k.includes('business') || k.includes('जुड़ना')) extracted.business_type = v;
+                    else if (k.includes('product') || k.includes('oil') || k.includes('कब_शुरू')) extracted.product_interest = v;
+                    else if (k.includes('inbox')) extracted.inbox_url = v;
+                  }
+                }
+              } catch (fetchErr) {
+                console.warn('Webhook leadgen fetch warning:', fetchErr.message);
+              }
+            } else if (Array.isArray(val.field_data)) {
+              for (const f of val.field_data) {
+                const v = Array.isArray(f.values) ? f.values[0] : '';
+                const k = (f.name || '').toLowerCase();
+                if (k.includes('name')) extracted.name = v;
+                if (k.includes('phone')) extracted.mobile = v;
+                if (k.includes('city')) extracted.city = v;
+                if (k.includes('state')) extracted.state = v;
+                if (k.includes('email')) extracted.email = v;
+              }
+            }
+          }
         }
       }
     }
 
-    const providerConfig = extracted.providerId
-      ? (settings.connectedIntegrations || []).find(p => p.providerId === extracted.providerId)
-      : null;
     const formConfig = extracted.formId
       ? (settings.metaForms || []).find(f => f.formId === extracted.formId)
       : (settings.metaForms || [])[0];
@@ -111,18 +143,39 @@ export async function POST(request) {
       );
     }
 
+    // Deduplicate if lead with same mobile or Meta leadgen ID already exists
+    if (cleanPhone) {
+      const existing = await Lead.findOne({ mobile: cleanPhone });
+      if (existing) {
+        return NextResponse.json({
+          success: true,
+          duplicate: true,
+          lead_id: existing.lead_id,
+          message: 'Lead already ingested in CRM.'
+        });
+      }
+    }
+    if (extracted.metaLeadId) {
+      const existingMeta = await Lead.findOne({ notes: { $regex: extracted.metaLeadId } });
+      if (existingMeta) {
+        return NextResponse.json({
+          success: true,
+          duplicate: true,
+          lead_id: existingMeta.lead_id,
+          message: 'Meta Lead ID already ingested in CRM.'
+        });
+      }
+    }
+
     const savedMobile = cleanPhone || (extracted.mobile ? String(extracted.mobile).substring(0, 20) : '0000000000');
     const tags = zeroLossTriggered ? ['Urgent'] : [];
-    const resolvedSource =
-      extracted.lead_source || providerConfig?.providerName || 'Facebook Meta Lead Ads';
+    const resolvedSource = 'Facebook Meta Lead Ads';
     const resolvedCampaign =
       extracted.campaign_name ||
-      providerConfig?.campaignName ||
       formConfig?.campaignName ||
       'Facebook Meta Lead Ads';
 
     const strategy =
-      providerConfig?.distributionRule ||
       formConfig?.distributionRule ||
       settings.distributionStrategy ||
       'ROUND_ROBIN';
@@ -139,7 +192,7 @@ export async function POST(request) {
     }
 
     let callerPool = activeCallers;
-    const targetTeam = providerConfig?.assignedTeam || formConfig?.assignedTeam;
+    const targetTeam = formConfig?.assignedTeam;
     if (targetTeam) {
       const teamCallers = activeCallers.filter(
         c => (c.team || '').toLowerCase() === targetTeam.toLowerCase()
@@ -195,17 +248,7 @@ export async function POST(request) {
         : `Captured via ${resolvedSource} Webhook • Campaign="${resolvedCampaign}"`
     });
 
-    if (providerConfig) {
-      const pIdx = (settings.connectedIntegrations || []).findIndex(
-        p => p.providerId === providerConfig.providerId
-      );
-      if (pIdx >= 0) {
-        settings.connectedIntegrations[pIdx].leadsCaptured =
-          (settings.connectedIntegrations[pIdx].leadsCaptured || 0) + 1;
-        settings.connectedIntegrations[pIdx].lastSyncAt = new Date();
-        settings.markModified('connectedIntegrations');
-      }
-    } else if (formConfig) {
+    if (formConfig) {
       const idx = (settings.metaForms || []).findIndex(f => f.formId === formConfig.formId);
       if (idx >= 0) {
         settings.metaForms[idx].leadsCaptured = (settings.metaForms[idx].leadsCaptured || 0) + 1;

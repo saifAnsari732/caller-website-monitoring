@@ -175,10 +175,10 @@ export default function BoostPage() {
                 <button
                   key={b.val}
                   onClick={() => setSelectedMultiplier(b.val)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 ${
                     selectedMultiplier === b.val
-                      ? 'bg-white text-blue-700 shadow-sm'
-                      : 'bg-white/10 hover:bg-white/20 text-white'
+                      ? 'bg-white text-blue-700 shadow-md font-extrabold border border-white/60'
+                      : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
                   }`}
                 >
                   {b.label}
@@ -283,10 +283,10 @@ export default function BoostPage() {
                     <button
                       onClick={() => handleBoostCampaign(c, selectedMultiplier)}
                       disabled={isBoosting}
-                      className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold shadow-md shadow-amber-500/25 border border-amber-300/40 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                     >
                       {isBoosting ? (
-                        <Loader2 size={14} className="animate-spin" />
+                        <Loader2 size={14} className="animate-spin text-white" />
                       ) : (
                         <Zap size={14} className="fill-white" />
                       )}
@@ -296,7 +296,7 @@ export default function BoostPage() {
                     <button
                       onClick={() => handleAccelerateLeads(c)}
                       disabled={isBoosting}
-                      className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                      className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
                     >
                       <Sparkles size={12} className="text-amber-500" />
                       <span>Accelerate Real Lead Sync</span>

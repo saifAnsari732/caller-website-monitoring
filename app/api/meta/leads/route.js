@@ -240,7 +240,89 @@ export async function POST(request) {
       });
     }
 
-    // Action 2: Sync Leads from Linked Meta Form directly from Meta Graph API
+    // Action 2: Ingest Single Real Lead directly from Meta Forms Browser
+    if (body.action === 'INGEST_SINGLE_LEAD') {
+      const { leadData, formId } = body;
+      if (!leadData) {
+        return NextResponse.json({ error: 'leadData is required' }, { status: 400 });
+      }
+
+      const formConfig = (settings.metaForms || []).find(f => f.formId === formId) || settings.metaForms?.[0];
+      const formName = formConfig?.formName || 'Meta Lead Form';
+      const campaignName = formConfig?.campaignName || 'Facebook Meta Lead Ads';
+
+      const cleanMobile = sanitizePhone(leadData.phone || leadData.mobile);
+      const isPhoneValid = cleanMobile && cleanMobile.length === 10;
+      const phoneToStore = isPhoneValid ? cleanMobile : (leadData.phone || leadData.mobile || '0000000000');
+      const tags = isPhoneValid ? [] : ['Urgent'];
+
+      // Deduplicate by mobile or Meta Lead ID
+      let existing = null;
+      if (cleanMobile && cleanMobile.length === 10) {
+        existing = await Lead.findOne({ mobile: cleanMobile });
+      }
+      if (!existing && leadData.id) {
+        existing = await Lead.findOne({ notes: { $regex: leadData.id } });
+      }
+
+      if (existing) {
+        return NextResponse.json({
+          success: true,
+          alreadyExists: true,
+          lead_id: existing.lead_id,
+          message: `Lead "${existing.name}" (${existing.mobile}) already exists in CRM.`
+        });
+      }
+
+      const chosenCaller = await pickCallerForForm(activeCallers, formConfig, settings.distributionStrategy);
+
+      let leadNotes = `Real Meta Lead Ads Ingestion • Form: "${formName}" (${formId || ''})`;
+      if (leadData.id) leadNotes += ` • Lead ID: ${leadData.id}`;
+      if (leadData.inbox_url) leadNotes += ` • Inbox: ${leadData.inbox_url}`;
+      if (leadData.custom_question_1) leadNotes += ` • Q1: ${leadData.custom_question_1}`;
+      if (leadData.custom_question_2) leadNotes += ` • Q2: ${leadData.custom_question_2}`;
+
+      const created = await Lead.create({
+        name: leadData.full_name || leadData.name || 'Facebook Meta Prospect',
+        mobile: phoneToStore,
+        email: leadData.email || '',
+        city: leadData.city || 'Indore',
+        state: leadData.state || 'Uttar Pradesh',
+        business_type: leadData.custom_question_1 || leadData.business_type || 'Distributor',
+        product_interest: leadData.custom_question_2 || leadData.product_interest || 'Mustard Oil (15L Tin)',
+        lead_source: 'Facebook Meta Lead Ads',
+        campaign_name: campaignName,
+        status: chosenCaller ? 'Assigned' : 'Fresh Lead',
+        assigned_to: chosenCaller ? chosenCaller._id : null,
+        assigned_at: chosenCaller ? new Date() : null,
+        tags,
+        notes: leadNotes
+      });
+
+      if (formConfig) {
+        const idx = settings.metaForms.findIndex(f => f.formId === formConfig.formId);
+        if (idx >= 0) {
+          settings.metaForms[idx].leadsCaptured = (settings.metaForms[idx].leadsCaptured || 0) + 1;
+          settings.metaForms[idx].lastLeadAt = new Date();
+          settings.markModified('metaForms');
+          await settings.save();
+        }
+      }
+
+      purgeDashboardCache();
+      purgeMetaCache();
+
+      return NextResponse.json({
+        success: true,
+        lead_id: created.lead_id,
+        name: created.name,
+        mobile: created.mobile,
+        assignedTo: chosenCaller ? chosenCaller.name : 'Unassigned',
+        message: `Successfully pushed "${created.name}" to CRM and assigned to ${chosenCaller ? chosenCaller.name : 'Queue'}!`
+      });
+    }
+
+    // Action 3: Sync Leads from Linked Meta Form directly from Meta Graph API
     if (body.action === 'SYNC_FORM_LEADS') {
       const { formId, count = 10 } = body;
       const formConfig = (settings.metaForms || []).find(f => f.formId === formId) || settings.metaForms?.[0];

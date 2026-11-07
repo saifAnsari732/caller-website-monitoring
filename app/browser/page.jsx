@@ -95,17 +95,20 @@ export default function BrowserPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'SYNC_FORM_LEADS',
+          action: 'INGEST_SINGLE_LEAD',
           formId: selectedFormId,
-          count: 5
+          leadData: lead
         })
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`Lead "${lead.full_name}" synced & routed to telecallers!`);
+        showToast(data.message || `Lead "${lead.full_name}" pushed to CRM & assigned to telecallers!`);
+      } else {
+        showToast(`Notice: ${data.error || 'Failed to ingest lead'}`);
       }
     } catch (e) {
       console.error(e);
+      showToast('Error connecting to CRM API.');
     } finally {
       setIngestingId(null);
     }
@@ -224,7 +227,7 @@ export default function BrowserPage() {
                 <button
                   onClick={() => fetchFormLeads(selectedFormId)}
                   disabled={loadingLeads}
-                  className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 border border-blue-200/80 text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95 cursor-pointer"
                 >
                   <RefreshCw size={13} className={loadingLeads ? 'animate-spin' : ''} />
                   <span>Refresh Leads</span>
@@ -312,7 +315,7 @@ export default function BrowserPage() {
                                 href={l.inbox_url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-[11px] font-bold transition-colors"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[11px] font-bold shadow-sm shadow-blue-500/20 border border-blue-400/30 transition-all active:scale-95"
                               >
                                 <span>Messenger</span>
                                 <ExternalLink size={11} />
@@ -326,9 +329,9 @@ export default function BrowserPage() {
                             <button
                               onClick={() => handleIngestSingleLead(l)}
                               disabled={isIngesting}
-                              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-bold shadow-sm shadow-emerald-500/20 border border-emerald-400/30 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
                             >
-                              {isIngesting ? <Loader2 size={12} className="animate-spin" /> : <span>Push to CRM</span>}
+                              {isIngesting ? <Loader2 size={12} className="animate-spin text-white" /> : <span>Push to CRM</span>}
                             </button>
                           </td>
                         </tr>

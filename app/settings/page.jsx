@@ -320,7 +320,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <button
                 onClick={handleLaunchMetaOAuth}
-                className="px-4 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1877F2] via-[#0d65d9] to-[#0866FF] hover:from-[#166fe5] hover:to-[#005ee5] text-white text-xs font-bold transition-all shadow-md shadow-blue-600/30 border border-blue-400/40 flex items-center gap-2 cursor-pointer active:scale-95"
               >
                 <Facebook size={15} />
                 <span>Launch Meta OAuth 2.0</span>
@@ -329,17 +329,17 @@ export default function SettingsPage() {
               <button
                 onClick={handleFullMetaSync}
                 disabled={syncingAll}
-                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-slate-900 to-zinc-900 hover:from-slate-800 hover:to-slate-900 text-white text-xs font-bold transition-all shadow-md shadow-slate-900/25 border border-slate-700 flex items-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
               >
-                {syncingAll ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+                {syncingAll ? <Loader2 size={15} className="animate-spin text-white" /> : <RefreshCw size={15} />}
                 <span>Sync All Forms & Leads</span>
               </button>
 
               <button
                 onClick={() => setShowTokenInput(!showTokenInput)}
-                className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 text-xs font-bold transition-all shadow-2xs hover:shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
-                <KeyRound size={14} />
+                <KeyRound size={14} className="text-slate-600" />
                 <span>Token</span>
               </button>
             </div>
@@ -416,20 +416,20 @@ export default function SettingsPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab('FORMS')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 ${
                 activeTab === 'FORMS'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  ? 'bg-gradient-to-r from-[#1877F2] to-[#0866FF] text-white shadow-md shadow-blue-500/25 border border-blue-400/40'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-2xs'
               }`}
             >
               Real Meta Lead Forms ({metaForms.length})
             </button>
             <button
               onClick={() => setActiveTab('WEBHOOK')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 ${
                 activeTab === 'WEBHOOK'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-500/25 border border-teal-400/40'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-2xs'
               }`}
             >
               Webhook & Zero-Loss Engine
@@ -540,16 +540,16 @@ export default function SettingsPage() {
                               <button
                                 onClick={() => handleSyncSingleForm(form.formId, form.formName)}
                                 disabled={isSyncing}
-                                className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-sm shadow-blue-500/20 border border-blue-400/30 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
                                 title="Fetch fresh leads from Meta"
                               >
-                                {isSyncing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                {isSyncing ? <Loader2 size={12} className="animate-spin text-white" /> : <RefreshCw size={12} />}
                                 <span>Sync Leads</span>
                               </button>
 
                               <button
                                 onClick={() => handleOpenFieldMapping(form)}
-                                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
                                 title="Configure question mapping"
                               >
                                 <SlidersHorizontal size={12} />

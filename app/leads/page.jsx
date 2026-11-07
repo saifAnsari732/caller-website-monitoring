@@ -308,13 +308,13 @@ export default function LeadsPage() {
           <div className="flex items-center gap-2.5">
             <button
               onClick={handleExportCSV}
-              className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 text-xs font-bold rounded-xl shadow-2xs hover:shadow-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
             >
               <Download size={15} /> Export CSV
             </button>
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm shadow-blue-500/20 transition-all flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/25 border border-blue-400/40 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
             >
               <UserPlus size={15} /> Add Manual Lead
             </button>
@@ -472,9 +472,9 @@ export default function LeadsPage() {
                         <td className="py-4 px-5 text-right">
                           <button
                             onClick={() => openInspector(lead._id)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-700 rounded-xl font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                            className="px-3.5 py-1.5 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 rounded-xl font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
                           >
-                            <Eye size={14} /> Timeline
+                            <Eye size={14} className="text-slate-600" /> Timeline
                           </button>
                         </td>
                       </tr>

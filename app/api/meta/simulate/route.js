@@ -42,9 +42,6 @@ export async function POST(request) {
     const formConfig = formId
       ? (settings.metaForms || []).find(f => f.formId === formId)
       : (settings.metaForms || [])[0];
-    const providerConfig = providerId
-      ? (settings.connectedIntegrations || []).find(p => p.providerId === providerId)
-      : null;
 
     const cleanPhone = sanitizePhone(mobile);
     const zeroLossTriggered = !cleanPhone;
@@ -59,15 +56,15 @@ export async function POST(request) {
 
     const savedMobile = cleanPhone || (mobile ? String(mobile).substring(0, 20) : '0000000000');
     const tags = zeroLossTriggered ? ['Urgent'] : [];
-    const resolvedSource = lead_source || providerConfig?.providerName || 'Facebook Meta Lead Ads';
-    const resolvedCampaign = campaign_name || providerConfig?.campaignName || formConfig?.campaignName || 'Facebook Meta Lead Ads';
-    const resolvedFormName = providerConfig ? `${providerConfig.providerName} Webhook` : (formConfig?.formName || 'KisanChoice Lead Form 2026');
+    const resolvedSource = 'Facebook Meta Lead Ads';
+    const resolvedCampaign = campaign_name || formConfig?.campaignName || 'Facebook Meta Lead Ads';
+    const resolvedFormName = formConfig?.formName || 'KisanChoice Lead Form 2026';
 
     const notes = zeroLossTriggered
-      ? `[URGENT] Invalid Phone Provided (${mobile || 'Empty'})! Saved via Zero-Loss Fallback.\nReceived via ${resolvedSource} Webhook (${resolvedFormName}).`
+      ? `[URGENT] Invalid Phone Provided (${mobile || 'Empty'})! Saved via Zero-Loss Fallback.\nReceived via Meta Webhook (${resolvedFormName}).`
       : `Received via ${resolvedSource} Webhook. Source="${resolvedFormName}" • Campaign="${resolvedCampaign}"`;
 
-    const strategy = providerConfig?.distributionRule || formConfig?.distributionRule || settings?.distributionStrategy || 'ROUND_ROBIN';
+    const strategy = formConfig?.distributionRule || settings?.distributionStrategy || 'ROUND_ROBIN';
     const autoSyncAllowed = (settings.metaConfig?.autoSyncEnabled ?? true) && (formConfig ? formConfig.active !== false : true);
 
     let activeCallers = await User.find({
@@ -135,14 +132,7 @@ export async function POST(request) {
       notes
     });
 
-    if (providerConfig) {
-      const pIdx = (settings.connectedIntegrations || []).findIndex(p => p.providerId === providerConfig.providerId);
-      if (pIdx >= 0) {
-        settings.connectedIntegrations[pIdx].leadsCaptured = (settings.connectedIntegrations[pIdx].leadsCaptured || 0) + 1;
-        settings.connectedIntegrations[pIdx].lastSyncAt = new Date();
-        settings.markModified('connectedIntegrations');
-      }
-    } else if (formConfig) {
+    if (formConfig) {
       const idx = (settings.metaForms || []).findIndex(f => f.formId === formConfig.formId);
       if (idx >= 0) {
         settings.metaForms[idx].leadsCaptured = (settings.metaForms[idx].leadsCaptured || 0) + 1;

@@ -210,11 +210,11 @@ export default function CampaignsPage() {
             <button
               onClick={handleSyncAllFromMeta}
               disabled={syncingMeta}
-              className="px-5 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold text-xs shadow-sm flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1877F2] to-[#0866FF] hover:from-[#166fe5] hover:to-[#005ee5] text-white font-bold text-xs shadow-md shadow-blue-600/25 border border-blue-400/40 flex items-center gap-2 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
             >
               {syncingMeta ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" /> Syncing All Campaigns & Leads...
+                  <Loader2 size={16} className="animate-spin text-white" /> Syncing All Campaigns & Leads...
                 </>
               ) : (
                 <>
@@ -224,25 +224,25 @@ export default function CampaignsPage() {
             </button>
             <Link
               href="/goal"
-              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 border border-blue-200/80 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
             >
-              <Target size={14} className="text-blue-600" /> Goals
+              <Target size={14} className="text-blue-600" /> Goals Hub
             </Link>
             <Link
               href="/boost"
-              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 text-amber-700 border border-amber-200/80 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
             >
-              <Zap size={14} className="text-amber-500" /> Boost
+              <Zap size={14} className="text-amber-500" /> Boost Budget
             </Link>
             <Link
               href="/browser"
-              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 text-purple-700 border border-purple-200/80 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
             >
               <Sparkles size={14} className="text-purple-600" /> Forms Browser
             </Link>
             <Link
               href="/settings"
-              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
             >
               OAuth Settings
             </Link>
@@ -271,7 +271,7 @@ export default function CampaignsPage() {
               <DollarSign size={18} className="text-emerald-600" />
             </div>
             <p className="text-3xl font-heading font-extrabold text-emerald-600 tabular-nums">
-              ₹{(metaData?.totalSpend || 207698.30).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+              ₹{(metaData?.totalSpend || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
             </p>
             <p className="text-[11px] text-slate-400 mt-1">Total investment across campaigns</p>
           </div>
@@ -302,23 +302,25 @@ export default function CampaignsPage() {
         <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
           <button
             onClick={() => setActiveTab('META_SYNC')}
-            className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer transition-all ${
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95 ${
               activeTab === 'META_SYNC'
-                ? 'bg-[#1877F2] text-white shadow-xs'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                ? 'bg-gradient-to-r from-[#1877F2] to-[#0866FF] text-white shadow-md shadow-blue-500/25 border border-blue-400/40'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
             }`}
           >
-            <Facebook size={14} /> Meta Ads Campaigns ({metaList.length})
+            <Facebook size={14} className={activeTab === 'META_SYNC' ? 'text-blue-100' : 'text-[#1877F2]'} />
+            Meta Ads Campaigns ({metaList.length})
           </button>
           <button
             onClick={() => setActiveTab('ALL_CAMPAIGNS')}
-            className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer transition-all ${
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95 ${
               activeTab === 'ALL_CAMPAIGNS'
-                ? 'bg-purple-700 text-white shadow-xs'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/25 border border-purple-400/40'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
             }`}
           >
-            <Layers size={14} /> All Multi-Channel Pipelines ({campaigns.length})
+            <Layers size={14} className={activeTab === 'ALL_CAMPAIGNS' ? 'text-purple-100' : 'text-purple-600'} />
+            All Multi-Channel Pipelines ({campaigns.length})
           </button>
         </div>
 

@@ -566,7 +566,7 @@ export default function Dashboard() {
             {/* Primary Action Button: Add Lead */}
             <button
               onClick={() => setShowAddLeadModal(true)}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-2 transition-colors cursor-pointer"
+              className="px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/25 border border-blue-400/40 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
             >
               <Plus size={15} /> Add New Lead
             </button>
@@ -577,7 +577,7 @@ export default function Dashboard() {
                 const nextLead = filteredLeads.find(l => l.status === 'Fresh Lead' || l.status === 'Assigned') || filteredLeads[0];
                 if (nextLead) openDialerForLead(nextLead);
               }}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-2 transition-colors cursor-pointer"
+              className="px-4 py-2.5 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-700 hover:to-violet-700 text-white text-xs font-bold rounded-xl shadow-md shadow-purple-500/25 border border-purple-400/40 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
             >
               <PhoneCall size={15} /> Open Quick Dialer
             </button>
@@ -586,18 +586,18 @@ export default function Dashboard() {
             <button
               onClick={handleSyncMetaLeads}
               disabled={syncingMeta}
-              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-2 transition-colors cursor-pointer"
+              className="px-4 py-2.5 bg-gradient-to-r from-[#1877F2] via-[#0d65d9] to-[#0866FF] hover:from-[#166fe5] hover:to-[#005ee5] text-white text-xs font-bold rounded-xl shadow-md shadow-blue-600/30 border border-blue-300/40 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer disabled:opacity-50"
             >
-              {syncingMeta ? <Loader2 size={15} className="animate-spin text-blue-400" /> : <Zap size={15} className="text-amber-400" />}
+              {syncingMeta ? <Loader2 size={15} className="animate-spin text-white" /> : <Zap size={15} className="text-amber-300" />}
               Sync Meta Ads Leads
             </button>
 
             {/* Follow-ups Due Today Button */}
             <Link
               href="/followups"
-              className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 text-xs font-semibold rounded-xl flex items-center gap-2 transition-colors"
+              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold rounded-xl shadow-md shadow-amber-500/25 border border-amber-300/40 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
             >
-              <Calendar size={15} className="text-amber-600" />
+              <Calendar size={15} className="text-amber-100" />
               Callbacks Due Today ({kpis.pendingFollowups})
             </Link>
 
@@ -605,16 +605,16 @@ export default function Dashboard() {
             <button
               onClick={handleAutoRedistributeSLA}
               disabled={redistributing}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
+              className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-500/25 border border-emerald-400/40 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer disabled:opacity-50"
             >
-              {redistributing ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+              {redistributing ? <Loader2 size={15} className="animate-spin text-white" /> : <RefreshCw size={15} />}
               Auto-Distribute Stuck Leads
             </button>
 
             {/* Export Report CSV Button */}
             <Link
               href="/reports"
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 transition-colors ml-auto"
+              className="px-4 py-2.5 bg-gradient-to-r from-slate-800 via-slate-900 to-zinc-900 hover:from-slate-900 hover:to-black text-white text-xs font-bold rounded-xl shadow-md shadow-slate-900/25 border border-slate-700 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer ml-auto"
             >
               <Download size={15} /> Export Excel / Reports
             </Link>
@@ -720,39 +720,47 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           {/* Interactive Switcher Buttons Bar */}
           <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => setActiveTab('LEADS')}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                  activeTab === 'LEADS' ? 'bg-blue-600 text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm active:scale-95 ${
+                  activeTab === 'LEADS'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 border border-blue-400/40'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs'
                 }`}
               >
-                <Layers size={14} />
+                <Layers size={14} className={activeTab === 'LEADS' ? 'text-blue-100' : 'text-blue-600'} />
                 Live Captured Leads & Bulk Dialer ({rawRecentLeads.length})
               </button>
               <button
                 onClick={() => setActiveTab('CALLERS')}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                  activeTab === 'CALLERS' ? 'bg-blue-600 text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm active:scale-95 ${
+                  activeTab === 'CALLERS'
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/25 border border-purple-400/40'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs'
                 }`}
               >
-                <Users size={14} />
+                <Users size={14} className={activeTab === 'CALLERS' ? 'text-purple-100' : 'text-purple-600'} />
                 Active Telecaller Floor ({team.length})
               </button>
               <button
                 onClick={() => setActiveTab('CAMPAIGNS')}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                  activeTab === 'CAMPAIGNS' ? 'bg-blue-600 text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm active:scale-95 ${
+                  activeTab === 'CAMPAIGNS'
+                    ? 'bg-gradient-to-r from-[#1877F2] to-[#0057c7] text-white shadow-md shadow-blue-500/25 border border-blue-400/40'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs'
                 }`}
               >
-                <Target size={14} />
+                <Target size={14} className={activeTab === 'CAMPAIGNS' ? 'text-blue-100' : 'text-[#1877F2]'} />
                 Meta Campaigns ({campaigns.length})
               </button>
               {kpis.slaBreachCount > 0 && (
                 <button
                   onClick={() => setActiveTab('SLA')}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                    activeTab === 'SLA' ? 'bg-rose-600 text-white shadow-xs' : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm active:scale-95 ${
+                    activeTab === 'SLA'
+                      ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-md shadow-rose-500/25 border border-rose-400/40'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
                   }`}
                 >
                   <Clock size={14} />
@@ -790,20 +798,20 @@ export default function Dashboard() {
                   </span>
                   <button
                     onClick={() => setQuickPreset('ALL')}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 ${
                       quickPreset === 'ALL'
-                        ? 'bg-slate-900 text-white shadow-2xs'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-sm shadow-slate-900/20 border border-slate-700'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                     }`}
                   >
                     All Captured ({presetCounts.ALL})
                   </button>
                   <button
                     onClick={() => setQuickPreset('META')}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-2xs active:scale-95 ${
                       quickPreset === 'META'
-                        ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                        ? 'bg-gradient-to-r from-[#1877F2] to-[#0866FF] text-white shadow-sm shadow-blue-500/25 border border-blue-400/40'
+                        : 'bg-blue-50/80 text-blue-700 border border-blue-200 hover:bg-blue-100'
                     }`}
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
@@ -811,30 +819,30 @@ export default function Dashboard() {
                   </button>
                   <button
                     onClick={() => setQuickPreset('FRESH')}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-2xs active:scale-95 ${
                       quickPreset === 'FRESH'
-                        ? 'bg-sky-600 text-white shadow-2xs'
-                        : 'bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100'
+                        ? 'bg-gradient-to-r from-sky-500 to-cyan-600 text-white shadow-sm shadow-sky-500/25 border border-sky-400/40'
+                        : 'bg-sky-50/80 text-sky-700 border border-sky-200 hover:bg-sky-100'
                     }`}
                   >
                     Fresh in Queue ({presetCounts.FRESH})
                   </button>
                   <button
                     onClick={() => setQuickPreset('UNASSIGNED')}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-2xs active:scale-95 ${
                       quickPreset === 'UNASSIGNED'
-                        ? 'bg-amber-600 text-white shadow-2xs'
-                        : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/25 border border-amber-400/40'
+                        : 'bg-amber-50/80 text-amber-800 border border-amber-200 hover:bg-amber-100'
                     }`}
                   >
                     Unassigned ({presetCounts.UNASSIGNED})
                   </button>
                   <button
                     onClick={() => setQuickPreset('HOT')}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-2xs active:scale-95 ${
                       quickPreset === 'HOT'
-                        ? 'bg-indigo-600 text-white shadow-2xs'
-                        : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm shadow-emerald-500/25 border border-emerald-400/40'
+                        : 'bg-emerald-50/80 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
                     }`}
                   >
                     ⭐ Hot / Interested ({presetCounts.HOT})
@@ -1130,7 +1138,7 @@ export default function Dashboard() {
                               <div className="flex items-center justify-end gap-2">
                                 <button
                                   onClick={() => openDialerForLead(lead)}
-                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                                  className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm shadow-blue-500/25 border border-blue-400/30 transition-all active:scale-95 cursor-pointer"
                                   title="Open Quick Dialer for this lead"
                                 >
                                   <Phone size={13} /> Call
@@ -1139,14 +1147,14 @@ export default function Dashboard() {
                                   href={`https://wa.me/91${String(lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${lead.name} ji, KisanConnect regarding your recent inquiry.`)}`}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
+                                  className="p-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-sm shadow-emerald-500/25 border border-emerald-400/30 transition-all active:scale-95 cursor-pointer flex items-center justify-center"
                                   title="Open Direct WhatsApp Chat"
                                 >
                                   <MessageCircle size={15} />
                                 </a>
                                 <Link
                                   href={`/leads?search=${encodeURIComponent(lead.lead_id)}`}
-                                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                                  className="px-3 py-1.5 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
                                 >
                                   Details
                                 </Link>

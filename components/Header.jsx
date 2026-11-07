@@ -70,9 +70,9 @@ export default function Header({ title, subtitle }) {
         {/* Meta OAuth Setup Shortcut */}
         <Link
           href="/settings"
-          className="hidden lg:flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200/80 rounded-xl text-xs font-semibold transition-colors"
+          className="hidden lg:flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 hover:from-purple-100 hover:to-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs active:scale-95"
         >
-          <Workflow size={14} className="text-slate-500" />
+          <Workflow size={14} className="text-indigo-600" />
           <span>Meta Integrations</span>
         </Link>
 
@@ -80,10 +80,10 @@ export default function Header({ title, subtitle }) {
         <button
           onClick={handleSyncRealMetaLeads}
           disabled={syncing}
-          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-blue-600/20 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-60"
+          className="px-4 py-2 bg-gradient-to-r from-[#1877F2] to-[#0866FF] hover:from-[#166fe5] hover:to-[#005ee5] text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/25 border border-blue-400/40 flex items-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-60"
           title="Fetch real incoming leads from Facebook Page & auto-distribute to telecaller"
         >
-          {syncing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} className="text-blue-100" />}
+          {syncing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} className="text-amber-300" />}
           <span className="hidden sm:inline">Sync Meta Leads</span>
         </button>
 

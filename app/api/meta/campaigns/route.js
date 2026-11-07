@@ -81,10 +81,9 @@ export async function POST(request) {
     const settings = await getOrInitSettings();
 
     const adAccountId = process.env.META_AD_ACCOUNT_ID || 'act_1796071777698019';
-    const token =
-      process.env.META_PAGE_ACCESS_TOKEN ||
-      settings.metaConfig?.accessToken ||
-      '';
+    const userToken = process.env.META_USER_ACCESS_TOKEN || '';
+    const pageToken = process.env.META_PAGE_ACCESS_TOKEN || settings.metaConfig?.accessToken || '';
+    const token = userToken || pageToken;
 
     if (body.action === 'SYNC_ALL_CAMPAIGNS') {
       let rawCampaigns = [];
@@ -108,7 +107,7 @@ export async function POST(request) {
         const pageId = settings.metaConfig?.pageId || '933429549844450';
         try {
           const formRes = await fetch(
-            `https://graph.facebook.com/v21.0/${pageId}/leadgen_forms?fields=id,name,status,leads_count,questions&limit=50&access_token=${token}`
+            `https://graph.facebook.com/v21.0/${pageId}/leadgen_forms?fields=id,name,status,leads_count,questions&limit=50&access_token=${pageToken || token}`
           );
           const formData = await formRes.json();
           if (Array.isArray(formData?.data)) {
@@ -119,18 +118,16 @@ export async function POST(request) {
         }
       }
 
-      // Fallback campaign catalog if Graph API unreachable or sandbox
-      if (rawCampaigns.length === 0) {
-        rawCampaigns = [
-          { id: '120247618442240711', name: 'Lucknow Video Editor Hiring - WhatsApp Leads', status: 'ACTIVE', objective: 'OUTCOME_LEADS', daily_budget: '30000', insights: { data: [{ impressions: 3798, clicks: 88, spend: 291.94 }] } },
-          { id: '120247608513170711', name: 'Raybarelly-Field Sales Hiring', status: 'PAUSED', objective: 'OUTCOME_LEADS', insights: { data: [{ impressions: 6861, clicks: 42, spend: 420.54 }] } },
-          { id: '120247588473210711', name: 'Varanasi-Field Sales Hiring', status: 'PAUSED', objective: 'OUTCOME_LEADS', insights: { data: [{ impressions: 10955, clicks: 367, spend: 723.18 }] } },
-          { id: '120247588389860711', name: 'Gaipur-Field Sales Hiring', status: 'PAUSED', objective: 'OUTCOME_LEADS', insights: { data: [{ impressions: 2683, clicks: 54, spend: 277.84 }] } },
-          { id: '120247588290420711', name: 'kanpur-Field Sales Hiring', status: 'PAUSED', objective: 'OUTCOME_LEADS', insights: { data: [{ impressions: 12547, clicks: 95, spend: 555.05 }] } },
-          { id: '120247588208940711', name: 'Kushinagar-Field Sales Hiring', status: 'PAUSED', objective: 'OUTCOME_LEADS', insights: { data: [{ impressions: 8412, clicks: 122, spend: 389.20 }] } },
-          { id: '120247588102140711', name: 'Mirzapur-Distributor Network Ads', status: 'ACTIVE', objective: 'OUTCOME_LEADS', daily_budget: '25000', insights: { data: [{ impressions: 15420, clicks: 410, spend: 890.50 }] } },
-          { id: '120247588052140711', name: 'MP & Rajasthan Bulk Mustard Oil Distributors', status: 'ACTIVE', objective: 'OUTCOME_LEADS', daily_budget: '50000', insights: { data: [{ impressions: 28400, clicks: 890, spend: 1850.00 }] } }
-        ];
+      // If Graph API temporarily unreachable, keep existing real campaigns stored in MongoDB
+      if (rawCampaigns.length === 0 && (settings.metaCampaigns || []).length > 0) {
+        rawCampaigns = settings.metaCampaigns.map(c => ({
+          id: c.campaignId,
+          name: c.name,
+          status: c.status,
+          objective: c.objective,
+          daily_budget: String((c.dailyBudget || 300) * 100),
+          insights: { data: [{ impressions: c.impressions || 0, clicks: c.clicks || 0, spend: c.spend || 0 }] }
+        }));
       }
 
       const activeCallers = await User.find({
@@ -316,6 +313,20 @@ export async function POST(request) {
         if (distributionRule) settings.metaCampaigns[idx].distributionRule = distributionRule;
         if (status) settings.metaCampaigns[idx].status = status;
         if (dailyBudget !== undefined) settings.metaCampaigns[idx].dailyBudget = Number(dailyBudget);
+
+        // Also push status toggle directly to Meta Graph API
+        if (status && token) {
+          try {
+            await fetch(`https://graph.facebook.com/v21.0/${campaignId}?access_token=${token}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status })
+            });
+          } catch (e) {
+            console.warn('Meta status sync error:', e.message);
+          }
+        }
+
         settings.markModified('metaCampaigns');
         await settings.save();
         purgeMetaCache();
@@ -335,7 +346,7 @@ export async function POST(request) {
           settings.metaCampaigns[idx].status = 'ACTIVE';
         }
 
-        // Attempt live budget update on Meta Graph API if token available
+        // Attempt live budget and status update on Meta Graph API
         let metaGraphUpdated = false;
         if (token && token.length > 20) {
           try {
@@ -349,6 +360,25 @@ export async function POST(request) {
             });
             const metaJson = await metaRes.json();
             metaGraphUpdated = metaJson.success === true;
+
+            // If campaign update failed because budget is defined on ad set level, update active ad sets!
+            if (!metaGraphUpdated && metaJson.error) {
+              const adsetsRes = await fetch(`https://graph.facebook.com/v21.0/${campaignId}/adsets?fields=id,name,daily_budget&access_token=${token}`);
+              const adsetsData = await adsetsRes.json();
+              if (Array.isArray(adsetsData?.data) && adsetsData.data.length > 0) {
+                for (const adset of adsetsData.data) {
+                  await fetch(`https://graph.facebook.com/v21.0/${adset.id}?access_token=${token}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      status: activateIfPaused ? 'ACTIVE' : undefined,
+                      daily_budget: String(targetBudget * 100)
+                    })
+                  });
+                }
+                metaGraphUpdated = true;
+              }
+            }
           } catch (e) {
             console.warn('Meta Graph budget boost warning:', e.message);
           }

@@ -68,12 +68,12 @@ export default function GoalsPage() {
   const handleOpenEditGoal = (campaign) => {
     setEditingGoal(campaign);
     setGoalForm({
-      targetLeadsDaily: 25,
-      targetCostPerLead: Math.round((campaign.spend || 500) / Math.max(1, campaign.leadsCount || 10)),
-      targetMonthlyBudget: (campaign.dailyBudget || 300) * 30,
-      slaTargetMinutes: 15,
-      conversionRateTarget: 14,
-      notes: `Target performance for ${campaign.name}`
+      targetLeadsDaily: campaign.goal?.targetLeadsDaily || campaign.targetLeadsDaily || 25,
+      targetCostPerLead: campaign.goal?.targetCostPerLead || campaign.targetCostPerLead || (campaign.leadsCount > 0 ? Math.round(campaign.spend / campaign.leadsCount) : 30),
+      targetMonthlyBudget: campaign.goal?.targetMonthlyBudget || campaign.targetMonthlyBudget || ((campaign.dailyBudget || 300) * 30),
+      slaTargetMinutes: campaign.goal?.slaTargetMinutes || 15,
+      conversionRateTarget: campaign.goal?.conversionRateTarget || 12,
+      notes: campaign.goal?.notes || `Performance target for ${campaign.name}`
     });
   };
 
@@ -194,7 +194,7 @@ export default function GoalsPage() {
                 setRefreshing(true);
                 fetchCampaignGoals();
               }}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 border border-blue-200/80 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
             >
               <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
               <span>Refresh Goals</span>
@@ -231,8 +231,12 @@ export default function GoalsPage() {
                   </tr>
                 ) : (
                   campaigns.map((c) => {
-                    const cpl = c.leadsCount > 0 ? (c.spend / c.leadsCount).toFixed(1) : (c.spend > 0 ? c.spend.toFixed(1) : '25.0');
-                    const isHealthy = Number(cpl) <= 35;
+                    const targetDaily = c.goal?.targetLeadsDaily || c.targetLeadsDaily || 25;
+                    const targetCPL = c.goal?.targetCostPerLead || c.targetCostPerLead || 30;
+                    const cpl = c.leadsCount > 0 ? (c.spend / c.leadsCount).toFixed(1) : (c.spend > 0 ? c.spend.toFixed(1) : Number(targetCPL).toFixed(1));
+                    const isHealthy = Number(cpl) <= Number(targetCPL);
+                    const pacingPct = Math.min(100, Math.round(((c.leadsCount || 0) / Math.max(1, targetDaily)) * 100));
+
                     return (
                       <tr key={c.campaignId} className="hover:bg-slate-50/60 transition-colors">
                         <td className="py-4 px-5">
@@ -252,8 +256,16 @@ export default function GoalsPage() {
                           </span>
                         </td>
 
-                        <td className="py-4 px-4 text-center font-heading font-extrabold text-blue-700 tabular-nums text-sm">
-                          25 / day
+                        <td className="py-4 px-4 text-center">
+                          <div className="font-heading font-extrabold text-blue-700 tabular-nums text-sm">
+                            {targetDaily} / day
+                          </div>
+                          <div className="w-20 mx-auto mt-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                              style={{ width: `${pacingPct}%` }}
+                            ></div>
+                          </div>
                         </td>
 
                         <td className="py-4 px-4 text-right font-medium text-slate-700 tabular-nums">
@@ -281,7 +293,7 @@ export default function GoalsPage() {
                         <td className="py-4 px-5 text-right">
                           <button
                             onClick={() => handleOpenEditGoal(c)}
-                            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 ml-auto transition-colors cursor-pointer"
+                            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-sm shadow-blue-500/20 border border-blue-400/30 flex items-center gap-1.5 ml-auto transition-all active:scale-95 cursor-pointer"
                           >
                             <Edit3 size={12} />
                             <span>Set Goal</span>
@@ -373,16 +385,16 @@ export default function GoalsPage() {
                   <button
                     type="button"
                     onClick={() => setEditingGoal(null)}
-                    className="px-4 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 shadow-2xs transition-all active:scale-95 cursor-pointer text-xs"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={savingGoal}
-                    className="px-5 py-2 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2.5 rounded-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-md shadow-emerald-500/25 border border-emerald-400/30 flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50 text-xs"
                   >
-                    {savingGoal ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                    {savingGoal ? <Loader2 size={13} className="animate-spin text-white" /> : <Save size={13} />}
                     <span>Save Goal</span>
                   </button>
                 </div>
