@@ -4,23 +4,10 @@ import Lead from '../../../../lib/models/Lead';
 import User from '../../../../lib/models/User';
 import { getOrInitSettings } from '../../../../lib/settings';
 import { purgeDashboardCache, purgeMetaCache } from '../../../../lib/cache';
+import { parseMetaLeadItem, sanitizePhone } from '../../../../lib/metaLeadParser';
 
 export const dynamic = 'force-dynamic';
 
-function sanitizePhone(phone) {
-  if (!phone) return '';
-  let cleaned = String(phone).replace(/[\s\-\(\)]/g, '');
-  cleaned = cleaned.replace(/^\+91/, '').replace(/^91/, '');
-  cleaned = cleaned.replace(/\D/g, '');
-  if (cleaned.length === 10 && !/^0+$/.test(cleaned)) return cleaned;
-  if (cleaned.length === 11 && cleaned.startsWith('0')) {
-    cleaned = cleaned.substring(1);
-    if (cleaned.length === 10 && !/^0+$/.test(cleaned)) return cleaned;
-  }
-  return '';
-}
-
-// 1. Meta Webhook Verification Handshake (GET /api/webhooks/meta?hub.mode=subscribe&hub.verify_token=...)
 export async function GET(request) {
   try {
     await connectDB();
@@ -32,7 +19,7 @@ export async function GET(request) {
     const source = searchParams.get('source');
 
     const expectedToken =
-      settings.metaConfig?.verifyToken || process.env.META_VERIFY_TOKEN || 'OILFLOW_CRM_SECRET_2026';
+      settings.metaConfig?.verifyToken || process.env.META_VERIFY_TOKEN || 'KISAN_META_WEBHOOK_VERIFY';
 
     if (mode === 'subscribe') {
       if (token === expectedToken) {
@@ -53,75 +40,77 @@ export async function GET(request) {
   }
 }
 
-// 2. Incoming Webhook Payload Receiver (POST /api/webhooks/meta?source=<providerId>)
 export async function POST(request) {
   const startTime = Date.now();
   try {
     await connectDB();
-    const { searchParams } = new URL(request.url);
-    const sourceParam = searchParams.get('source') || '';
     const body = await request.json().catch(() => ({}));
     const settings = await getOrInitSettings();
 
-    // Parse either standard JSON lead payload OR Meta Graph webhook entry[].changes[].value
     let extracted = {
-      name: body.name || body.full_name || body.sender_name || '',
-      mobile: body.mobile || body.phone || body.phone_number || body.sender_mobile || '',
-      email: body.email || '',
-      city: body.city || '',
-      state: body.state || 'Uttar Pradesh',
-      business_type: body.business_type || 'Distributor',
-      product_interest: body.product_interest || body.subject || 'Mustard Oil (15L Tin)',
-      formId: body.formId || body.form_id || '',
+      name: (body.name || body.full_name || body.sender_name || '').trim(),
+      mobile: (body.mobile || body.phone || body.phone_number || body.sender_mobile || '').trim(),
+      email: (body.email || '').trim(),
+      city: (body.city || '').trim(),
+      state: (body.state || '').trim(),
+      business_type: (body.business_type || '').trim(),
+      product_interest: (body.product_interest || body.subject || '').trim(),
+      formId: String(body.formId || body.form_id || ''),
       lead_source: 'Facebook Meta Lead Ads',
-      campaign_name: body.campaign_name || '',
+      campaign_name: (body.campaign_name || '').trim(),
       metaLeadId: '',
-      inbox_url: ''
+      notes: '',
+      createdTime: null
     };
 
-    const token = process.env.META_PAGE_ACCESS_TOKEN || process.env.META_USER_ACCESS_TOKEN || settings.metaConfig?.accessToken || '';
+    const token = process.env.META_PAGE_ACCESS_TOKEN || settings.metaConfig?.accessToken || process.env.META_USER_ACCESS_TOKEN || '';
 
-    // Handle incoming Meta Graph API Webhook payload
     if (Array.isArray(body.entry)) {
       for (const entry of body.entry) {
         for (const change of (entry.changes || [])) {
           if (change.value) {
             const val = change.value;
-            extracted.formId = val.form_id || extracted.formId;
+            extracted.formId = val.form_id ? String(val.form_id) : extracted.formId;
             extracted.metaLeadId = val.leadgen_id ? String(val.leadgen_id) : extracted.metaLeadId;
 
-            // If leadgen_id is provided, query Meta Graph API for full form answers
+            const matchedForm = (settings.metaForms || []).find(f => f.formId === extracted.formId);
+
             if (extracted.metaLeadId && token) {
               try {
-                const leadRes = await fetch(`https://graph.facebook.com/v21.0/${extracted.metaLeadId}?access_token=${token}`);
+                const leadRes = await fetch(
+                  `https://graph.facebook.com/v21.0/${extracted.metaLeadId}?fields=id,created_time,ad_name,campaign_name,form_id,field_data&access_token=${encodeURIComponent(token)}`,
+                  { cache: 'no-store' }
+                );
                 const leadData = await leadRes.json();
-                if (Array.isArray(leadData?.field_data)) {
-                  for (const f of leadData.field_data) {
-                    const v = Array.isArray(f.values) && f.values.length > 0 ? f.values[0] : '';
-                    const k = (f.name || '').toLowerCase();
-                    if (k.includes('name') && !k.includes('company')) extracted.name = v;
-                    else if (k.includes('phone') || k.includes('mobile')) extracted.mobile = v;
-                    else if (k.includes('email')) extracted.email = v;
-                    else if (k.includes('city')) extracted.city = v;
-                    else if (k.includes('state')) extracted.state = v;
-                    else if (k.includes('business') || k.includes('जुड़ना')) extracted.business_type = v;
-                    else if (k.includes('product') || k.includes('oil') || k.includes('कब_शुरू')) extracted.product_interest = v;
-                    else if (k.includes('inbox')) extracted.inbox_url = v;
-                  }
+                if (leadData && !leadData.error) {
+                  const parsed = parseMetaLeadItem(leadData, matchedForm?.formName || '');
+                  extracted.name = parsed.name || extracted.name;
+                  extracted.mobile = parsed.mobile || parsed.rawMobile || extracted.mobile;
+                  extracted.email = parsed.email || extracted.email;
+                  extracted.city = parsed.city || extracted.city;
+                  extracted.state = parsed.state || extracted.state;
+                  extracted.business_type = parsed.businessType || extracted.business_type;
+                  extracted.product_interest = parsed.productInterest || extracted.product_interest;
+                  extracted.campaign_name = parsed.campaignName || extracted.campaign_name;
+                  extracted.notes = parsed.notes;
+                  extracted.createdTime = parsed.createdTime;
                 }
               } catch (fetchErr) {
                 console.warn('Webhook leadgen fetch warning:', fetchErr.message);
               }
             } else if (Array.isArray(val.field_data)) {
-              for (const f of val.field_data) {
-                const v = Array.isArray(f.values) ? f.values[0] : '';
-                const k = (f.name || '').toLowerCase();
-                if (k.includes('name')) extracted.name = v;
-                if (k.includes('phone')) extracted.mobile = v;
-                if (k.includes('city')) extracted.city = v;
-                if (k.includes('state')) extracted.state = v;
-                if (k.includes('email')) extracted.email = v;
-              }
+              const parsed = parseMetaLeadItem(
+                { id: extracted.metaLeadId, field_data: val.field_data, campaign_name: val.campaign_name },
+                matchedForm?.formName || ''
+              );
+              extracted.name = parsed.name || extracted.name;
+              extracted.mobile = parsed.mobile || parsed.rawMobile || extracted.mobile;
+              extracted.email = parsed.email || extracted.email;
+              extracted.city = parsed.city || extracted.city;
+              extracted.state = parsed.state || extracted.state;
+              extracted.business_type = parsed.businessType || extracted.business_type;
+              extracted.product_interest = parsed.productInterest || extracted.product_interest;
+              extracted.notes = parsed.notes;
             }
           }
         }
@@ -130,20 +119,24 @@ export async function POST(request) {
 
     const formConfig = extracted.formId
       ? (settings.metaForms || []).find(f => f.formId === extracted.formId)
-      : (settings.metaForms || [])[0];
+      : null;
 
     const cleanPhone = sanitizePhone(extracted.mobile);
+    const rawMobile = String(extracted.mobile || '').trim();
+    if (!cleanPhone && !rawMobile) {
+      return NextResponse.json({ error: 'Webhook payload contained no mobile number.' }, { status: 400 });
+    }
+
     const zeroLossTriggered = !cleanPhone;
     const zeroLossAllowed = settings.metaConfig?.zeroLossFallback ?? true;
 
     if (zeroLossTriggered && !zeroLossAllowed) {
       return NextResponse.json(
-        { error: `Invalid phone number (${extracted.mobile || 'Empty'}) rejected.` },
+        { error: `Invalid phone number (${rawMobile}) rejected.` },
         { status: 400 }
       );
     }
 
-    // Deduplicate if lead with same mobile or Meta leadgen ID already exists
     if (cleanPhone) {
       const existing = await Lead.findOne({ mobile: cleanPhone });
       if (existing) {
@@ -167,18 +160,12 @@ export async function POST(request) {
       }
     }
 
-    const savedMobile = cleanPhone || (extracted.mobile ? String(extracted.mobile).substring(0, 20) : '0000000000');
+    const savedMobile = cleanPhone || rawMobile.substring(0, 20);
     const tags = zeroLossTriggered ? ['Urgent'] : [];
     const resolvedSource = 'Facebook Meta Lead Ads';
-    const resolvedCampaign =
-      extracted.campaign_name ||
-      formConfig?.campaignName ||
-      'Facebook Meta Lead Ads';
+    const resolvedCampaign = extracted.campaign_name || formConfig?.campaignName || formConfig?.formName || '';
 
-    const strategy =
-      formConfig?.distributionRule ||
-      settings.distributionStrategy ||
-      'ROUND_ROBIN';
+    const strategy = formConfig?.distributionRule || settings.distributionStrategy || 'ROUND_ROBIN';
 
     let activeCallers = await User.find({
       role: 'telecaller',
@@ -230,22 +217,23 @@ export async function POST(request) {
     }
 
     const newLead = await Lead.create({
-      name: extracted.name || 'Webhook Lead Prospect',
+      name: extracted.name || `Meta Lead ${extracted.metaLeadId || ''}`.trim(),
       mobile: savedMobile,
-      email: extracted.email || '',
-      city: extracted.city || 'Indore',
-      state: extracted.state || 'Madhya Pradesh',
-      business_type: extracted.business_type || 'Distributor',
-      product_interest: extracted.product_interest || 'Mustard Oil (15L Tin)',
+      email: extracted.email,
+      city: extracted.city,
+      state: extracted.state,
+      business_type: extracted.business_type,
+      product_interest: extracted.product_interest,
       lead_source: resolvedSource,
       campaign_name: resolvedCampaign,
       status: chosenCaller ? 'Assigned' : 'Fresh Lead',
       assigned_to: chosenCaller ? chosenCaller._id : null,
       assigned_at: chosenCaller ? new Date() : null,
       tags,
-      notes: zeroLossTriggered
-        ? `[URGENT] Invalid Phone (${extracted.mobile || 'Empty'})! Saved via Zero-Loss Fallback (${resolvedSource}).`
-        : `Captured via ${resolvedSource} Webhook • Campaign="${resolvedCampaign}"`
+      notes: extracted.notes || (zeroLossTriggered
+        ? `[URGENT] Unformatted Phone (${rawMobile}) saved via Zero-Loss Fallback.`
+        : `Captured via ${resolvedSource} Webhook${resolvedCampaign ? ` • Campaign="${resolvedCampaign}"` : ''}`),
+      ...(extracted.createdTime ? { createdAt: extracted.createdTime } : {})
     });
 
     if (formConfig) {
@@ -260,7 +248,6 @@ export async function POST(request) {
     settings.markModified('metaConfig');
     await settings.save();
 
-    // Invalidate Next.js cache so dashboard and metrics immediately reflect this lead
     purgeDashboardCache();
     purgeMetaCache();
 

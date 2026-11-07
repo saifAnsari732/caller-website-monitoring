@@ -24,7 +24,6 @@ import {
   Activity,
   Layers,
   ArrowRight,
-  Sparkles,
   Link2,
   CheckSquare,
   Lock,
@@ -47,6 +46,7 @@ export default function SettingsPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [banner, setBanner] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [formFilter, setFormFilter] = useState('ALL'); // 'ALL' | 'WITH_LEADS' | 'ACTIVE' | 'PAUSED'
   const [activeTab, setActiveTab] = useState('FORMS'); // 'FORMS' | 'WEBHOOK' | 'OAUTH'
 
   // Sync states
@@ -95,7 +95,12 @@ export default function SettingsPage() {
 
   // Open Real Meta OAuth Flow
   const handleLaunchMetaOAuth = () => {
-    const redirectUri = `${window.location.origin}/api/meta/oauth/callback`;
+    let redirectUri = `${window.location.origin}/api/meta/oauth/callback`;
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      // In Meta Live mode, HTTP localhost redirects are rejected by Facebook Enforce HTTPS policy.
+      // We route the OAuth dialog redirect through our verified production domain callback
+      redirectUri = 'https://caller-website-monitoring.vercel.app/api/meta/oauth/callback';
+    }
     const appId = status?.appId || '1007200718473332';
     const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
       redirectUri
@@ -186,13 +191,7 @@ export default function SettingsPage() {
       if (matched && matched.questions) {
         setAvailableQuestions(matched.questions);
       } else {
-        setAvailableQuestions([
-          { key: 'full_name', label: 'Full Name', mappedTo: 'name' },
-          { key: 'phone_number', label: 'Phone Number', mappedTo: 'mobile' },
-          { key: 'email', label: 'Email Address', mappedTo: 'email' },
-          { key: 'city', label: 'City / District', mappedTo: 'city' },
-          { key: 'inbox_url', label: 'Facebook Messenger Inbox URL', mappedTo: 'notes' }
-        ]);
+        setAvailableQuestions([]);
       }
     } catch (e) {
       console.error(e);
@@ -255,11 +254,18 @@ export default function SettingsPage() {
   };
 
   const metaForms = status?.metaForms || [];
-  const filteredForms = metaForms.filter(f =>
-    (f.formName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (f.campaignName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (f.formId || '').includes(searchQuery)
-  );
+  const filteredForms = metaForms.filter((f) => {
+    if (formFilter === 'WITH_LEADS' && !(Number(f.leadsCaptured) > 0)) return false;
+    if (formFilter === 'ACTIVE' && f.active === false) return false;
+    if (formFilter === 'PAUSED' && f.active !== false) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (f.formName || '').toLowerCase().includes(q) ||
+      (f.campaignName || '').toLowerCase().includes(q) ||
+      String(f.formId || '').includes(q)
+    );
+  });
 
   const stats = status?.stats || {
     totalMetaLeads: 0,
@@ -277,25 +283,25 @@ export default function SettingsPage() {
         subtitle="Live Facebook & Instagram Lead Ads sync, real OAuth 2.0 connection, leadgen forms routing & webhook telemetry"
       />
 
-      <main className="p-6 lg:p-8 space-y-6 flex-1 max-w-7xl mx-auto w-full">
+      <main className="px-5 lg:px-7 py-6 space-y-6 flex-1 w-full max-w-none">
         {banner && (
-          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-between shadow-xs">
+          <div className="px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center justify-between shadow-2xs">
             <div className="flex items-center gap-2">
               <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
               <span>{banner}</span>
             </div>
-            <button onClick={() => setBanner(null)} className="text-emerald-700 hover:text-emerald-900">
+            <button onClick={() => setBanner(null)} className="text-emerald-700 hover:text-emerald-900 cursor-pointer">
               <X size={14} />
             </button>
           </div>
         )}
 
         {/* Hero Card: Connected Facebook Page & Live Meta Status */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 p-6 lg:p-8 shadow-xs">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+        <div className="crm-card p-6 lg:p-7">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pb-6 border-b border-slate-100">
             <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#1877F2] text-white flex items-center justify-center font-black text-2xl shrink-0 shadow-md shadow-[#1877F2]/20">
-                f
+              <div className="w-12 h-12 rounded-2xl bg-[#1877F2] text-white flex items-center justify-center shrink-0 shadow-sm">
+                <Facebook size={22} />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2.5 flex-wrap">
@@ -303,7 +309,7 @@ export default function SettingsPage() {
                     {status?.pageName || 'Kisan Choice'}
                   </h2>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                     Meta Graph v21.0 Connected
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
@@ -311,7 +317,7 @@ export default function SettingsPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 font-medium">
-                  Ad Account: <strong className="text-slate-700">{status?.adAccountId || 'act_1796071777698019'} (Kisan Kumar)</strong> • Meta App: <strong className="text-slate-700">kisanGroups ({status?.appId || '1007200718473332'})</strong>
+                  Ad Account: <strong className="text-slate-700">{status?.adAccountId || 'act_1796071777698019'} (Kisan Kumar)</strong> · Meta App: <strong className="text-slate-700">kisanGroups ({status?.appId || '1007200718473332'})</strong>
                 </p>
               </div>
             </div>
@@ -320,7 +326,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <button
                 onClick={handleLaunchMetaOAuth}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1877F2] via-[#0d65d9] to-[#0866FF] hover:from-[#166fe5] hover:to-[#005ee5] text-white text-xs font-bold transition-all shadow-md shadow-blue-600/30 border border-blue-400/40 flex items-center gap-2 cursor-pointer active:scale-95"
+                className="px-4 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white text-xs font-semibold transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
               >
                 <Facebook size={15} />
                 <span>Launch Meta OAuth 2.0</span>
@@ -329,7 +335,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleFullMetaSync}
                 disabled={syncingAll}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-slate-900 to-zinc-900 hover:from-slate-800 hover:to-slate-900 text-white text-xs font-bold transition-all shadow-md shadow-slate-900/25 border border-slate-700 flex items-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {syncingAll ? <Loader2 size={15} className="animate-spin text-white" /> : <RefreshCw size={15} />}
                 <span>Sync All Forms & Leads</span>
@@ -337,10 +343,10 @@ export default function SettingsPage() {
 
               <button
                 onClick={() => setShowTokenInput(!showTokenInput)}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 text-xs font-bold transition-all shadow-2xs hover:shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <KeyRound size={14} className="text-slate-600" />
-                <span>Token</span>
+                <KeyRound size={14} className="text-slate-500" />
+                <span>Access Token</span>
               </button>
             </div>
           </div>
@@ -348,7 +354,7 @@ export default function SettingsPage() {
           {/* Collapsible Token Update Drawer */}
           {showTokenInput && (
             <div className="pt-5 pb-2">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <KeyRound size={14} className="text-blue-600" /> Page Access Token & System Credentials
@@ -366,7 +372,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleFullMetaSync}
                     disabled={syncingAll || !customToken.trim()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-40 cursor-pointer"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-40 cursor-pointer"
                   >
                     Save & Test
                   </button>
@@ -376,81 +382,106 @@ export default function SettingsPage() {
           )}
 
           {/* Real Live Metrics Bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6">
-            <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-6">
+            <div className="p-4 rounded-xl bg-slate-50/90 border border-slate-200/70">
               <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Real Leads</div>
               <div className="text-2xl font-heading font-extrabold text-slate-900 mt-1 tabular-nums">
                 {stats.totalMetaLeads}
               </div>
-              <div className="text-[11px] text-slate-500 mt-0.5 font-medium">Ingested from Meta Lead Ads</div>
+              <div className="text-xs text-slate-500 mt-0.5 font-medium">Ingested from Meta Lead Ads</div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100/60">
+            <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200/60">
               <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Today Leads</div>
               <div className="text-2xl font-heading font-extrabold text-blue-700 mt-1 tabular-nums">
                 {stats.todayLeads}
               </div>
-              <div className="text-[11px] text-blue-600 mt-0.5 font-medium">Live incoming pipeline</div>
+              <div className="text-xs text-blue-600 mt-0.5 font-medium">Live incoming pipeline</div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100/60">
+            <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200/60">
               <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Assigned to Agents</div>
               <div className="text-2xl font-heading font-extrabold text-emerald-700 mt-1 tabular-nums">
                 {stats.assignedLeads}
               </div>
-              <div className="text-[11px] text-emerald-600 mt-0.5 font-medium">Cyclic Round-Robin Pool</div>
+              <div className="text-xs text-emerald-600 mt-0.5 font-medium">Cyclic Round-Robin Pool</div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/60">
+            <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-200/60">
               <div className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">Active Lead Forms</div>
               <div className="text-2xl font-heading font-extrabold text-indigo-700 mt-1 tabular-nums">
                 {metaForms.length}
               </div>
-              <div className="text-[11px] text-indigo-600 mt-0.5 font-medium">Page: Kisan Choice</div>
+              <div className="text-xs text-indigo-600 mt-0.5 font-medium">Page: Kisan Choice</div>
             </div>
           </div>
         </div>
 
-        {/* Tab Switcher: Linked Real Forms | Webhook Health & Telemetry */}
-        <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3 flex-wrap">
-          <div className="flex items-center gap-2">
+        {/* Tab Switcher & Full-Width Filter Toolbar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-3.5">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setActiveTab('FORMS')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'FORMS'
-                  ? 'bg-gradient-to-r from-[#1877F2] to-[#0866FF] text-white shadow-md shadow-blue-500/25 border border-blue-400/40'
-                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-2xs'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
               }`}
             >
               Real Meta Lead Forms ({metaForms.length})
             </button>
             <button
               onClick={() => setActiveTab('WEBHOOK')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'WEBHOOK'
-                  ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-500/25 border border-teal-400/40'
-                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-2xs'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
               }`}
             >
               Webhook & Zero-Loss Engine
             </button>
           </div>
 
-          <div className="relative min-w-[240px]">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search forms or campaigns..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
-          </div>
+          {activeTab === 'FORMS' && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                {[
+                  { id: 'ALL', label: `All (${metaForms.length})` },
+                  { id: 'WITH_LEADS', label: `With Leads (${metaForms.filter((f) => Number(f.leadsCaptured) > 0).length})` },
+                  { id: 'ACTIVE', label: `Active (${metaForms.filter((f) => f.active !== false).length})` },
+                  { id: 'PAUSED', label: `Paused (${metaForms.filter((f) => f.active === false).length})` }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setFormFilter(tab.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      formFilter === tab.id
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative min-w-[260px]">
+                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search forms, ID, or campaign..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* TAB 1: Real Meta Lead Forms Table */}
         {activeTab === 'FORMS' && (
-          <div className="bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-xs">
+          <div className="crm-card overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="font-heading font-bold text-sm text-slate-900">
@@ -531,8 +562,16 @@ export default function SettingsPage() {
                             </button>
                           </td>
 
-                          <td className="py-4 px-4 text-right font-heading font-bold text-slate-900 tabular-nums">
-                            {form.leadsCaptured || 0}
+                          <td className="py-4 px-4 text-right">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-1 rounded-lg font-heading font-extrabold tabular-nums text-xs ${
+                                Number(form.leadsCaptured) > 0
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                                  : 'text-slate-500'
+                              }`}
+                            >
+                              {form.leadsCaptured || 0}
+                            </span>
                           </td>
 
                           <td className="py-4 px-5 text-right">
@@ -540,7 +579,7 @@ export default function SettingsPage() {
                               <button
                                 onClick={() => handleSyncSingleForm(form.formId, form.formName)}
                                 disabled={isSyncing}
-                                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-sm shadow-blue-500/20 border border-blue-400/30 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                                 title="Fetch fresh leads from Meta"
                               >
                                 {isSyncing ? <Loader2 size={12} className="animate-spin text-white" /> : <RefreshCw size={12} />}
@@ -549,7 +588,7 @@ export default function SettingsPage() {
 
                               <button
                                 onClick={() => handleOpenFieldMapping(form)}
-                                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                                 title="Configure question mapping"
                               >
                                 <SlidersHorizontal size={12} />
@@ -592,12 +631,12 @@ export default function SettingsPage() {
                     <input
                       type="text"
                       readOnly
-                      value="https://caller-app-1.onrender.com/api/webhooks/meta"
+                      value={status?.webhookUrl || 'https://caller-website-monitoring.vercel.app/api/webhooks/meta'}
                       className="w-full px-3.5 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
                     />
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText('https://caller-app-1.onrender.com/api/webhooks/meta');
+                        navigator.clipboard.writeText(status?.webhookUrl || 'https://caller-website-monitoring.vercel.app/api/webhooks/meta');
                         showToast('Webhook URL copied to clipboard!');
                       }}
                       className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
@@ -615,12 +654,12 @@ export default function SettingsPage() {
                     <input
                       type="text"
                       readOnly
-                      value={status?.verifyToken || 'OILFLOW_CRM_SECRET_2026'}
+                      value={status?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY'}
                       className="w-full px-3.5 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
                     />
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(status?.verifyToken || 'OILFLOW_CRM_SECRET_2026');
+                        navigator.clipboard.writeText(status?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY');
                         showToast('Verify token copied!');
                       }}
                       className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"

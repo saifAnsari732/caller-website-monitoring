@@ -153,9 +153,9 @@ export default function CallsPage() {
                 setDialForm({
                   leadId: leads[0]?.id || '',
                   callerId: telecallers[0]?.id || '',
-                  duration: 140,
+                  duration: 120,
                   status: 'Interested',
-                  notes: 'Client inquired about bulk 15L Mustard Oil tins rate list.'
+                  notes: ''
                 });
                 setShowDialModal(true);
               }}

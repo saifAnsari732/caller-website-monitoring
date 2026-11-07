@@ -10,21 +10,9 @@ import {
   purgeDashboardCache,
   getCacheHeaders
 } from '../../../../lib/cache';
+import { parseMetaLeadItem } from '../../../../lib/metaLeadParser';
 
 export const dynamic = 'force-dynamic';
-
-function sanitizePhone(phone) {
-  if (!phone) return '';
-  let cleaned = String(phone).replace(/[\s\-\(\)]/g, '');
-  cleaned = cleaned.replace(/^\+91/, '').replace(/^91/, '');
-  cleaned = cleaned.replace(/\D/g, '');
-  if (cleaned.length === 10 && !/^0+$/.test(cleaned)) return cleaned;
-  if (cleaned.length === 11 && cleaned.startsWith('0')) {
-    cleaned = cleaned.substring(1);
-    if (cleaned.length === 10 && !/^0+$/.test(cleaned)) return cleaned;
-  }
-  return '';
-}
 
 async function pickCallerForTeam(activeCallers, targetTeam, distributionRule) {
   if (!activeCallers || activeCallers.length === 0) return null;
@@ -51,15 +39,13 @@ async function pickCallerForTeam(activeCallers, targetTeam, distributionRule) {
     return counts[0].caller;
   }
 
-  // Round-robin
   const lastLead = await Lead.findOne({ assigned_to: { $in: pool.map(p => p._id) } })
     .sort({ assigned_at: -1 })
     .lean();
   const lastIdx = lastLead?.assigned_to
     ? pool.findIndex(p => p._id.toString() === lastLead.assigned_to.toString())
     : -1;
-  const nextIdx = (lastIdx + 1) % pool.length;
-  return pool[nextIdx];
+  return pool[(lastIdx + 1) % pool.length];
 }
 
 export async function GET() {
@@ -89,25 +75,25 @@ export async function POST(request) {
       let rawCampaigns = [];
       let rawForms = [];
 
-      // 1. Fetch campaigns from Meta Graph API
       if (token && token.length > 20) {
         try {
           const campRes = await fetch(
-            `https://graph.facebook.com/v21.0/${adAccountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time,insights{impressions,clicks,spend}&limit=50&access_token=${token}`
+            `https://graph.facebook.com/v21.0/${adAccountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time,insights{impressions,clicks,spend}&limit=50&access_token=${encodeURIComponent(token)}`,
+            { cache: 'no-store' }
           );
           const campData = await campRes.json();
           if (Array.isArray(campData?.data)) {
             rawCampaigns = campData.data;
           }
         } catch (err) {
-          console.warn('Failed to fetch from Meta Graph API, using existing:', err.message);
+          console.warn('Failed to fetch campaigns from Meta Graph API:', err.message);
         }
 
-        // 2. Fetch Leadgen forms from Page
         const pageId = settings.metaConfig?.pageId || '933429549844450';
         try {
           const formRes = await fetch(
-            `https://graph.facebook.com/v21.0/${pageId}/leadgen_forms?fields=id,name,status,leads_count,questions&limit=50&access_token=${pageToken || token}`
+            `https://graph.facebook.com/v21.0/${pageId}/leadgen_forms?fields=id,name,status,leads_count,questions&limit=50&access_token=${encodeURIComponent(pageToken || token)}`,
+            { cache: 'no-store' }
           );
           const formData = await formRes.json();
           if (Array.isArray(formData?.data)) {
@@ -118,129 +104,97 @@ export async function POST(request) {
         }
       }
 
-      // If Graph API temporarily unreachable, keep existing real campaigns stored in MongoDB
-      if (rawCampaigns.length === 0 && (settings.metaCampaigns || []).length > 0) {
-        rawCampaigns = settings.metaCampaigns.map(c => ({
-          id: c.campaignId,
-          name: c.name,
-          status: c.status,
-          objective: c.objective,
-          daily_budget: String((c.dailyBudget || 300) * 100),
-          insights: { data: [{ impressions: c.impressions || 0, clicks: c.clicks || 0, spend: c.spend || 0 }] }
-        }));
-      }
-
       const activeCallers = await User.find({
         role: 'telecaller',
         status: { $in: ['active', 'ACTIVE'] }
       }).select('name email mobile team').lean();
 
-      // Process and sync each campaign
       const existingMap = new Map((settings.metaCampaigns || []).map(c => [c.campaignId, c]));
       const updatedCampaigns = [];
       const newCapturedLeads = [];
 
+      // Sync new leads across active forms with leads_count > 0 using Page token
+      const formsWithLeads = rawForms.filter(f => Number(f.leads_count) > 0);
+      for (const form of formsWithLeads) {
+        try {
+          const leadRes = await fetch(
+            `https://graph.facebook.com/v21.0/${form.id}/leads?fields=id,created_time,ad_name,campaign_name,form_id,field_data&limit=25&access_token=${encodeURIComponent(pageToken || token)}`,
+            { cache: 'no-store' }
+          );
+          const leadData = await leadRes.json();
+          if (Array.isArray(leadData?.data)) {
+            for (const fl of leadData.data) {
+              const parsed = parseMetaLeadItem(fl, form.name);
+              if (!parsed.mobile || parsed.mobile.length !== 10) continue;
+
+              const exists = await Lead.findOne({
+                $or: [
+                  { mobile: parsed.mobile },
+                  ...(parsed.metaLeadId ? [{ notes: { $regex: parsed.metaLeadId } }] : [])
+                ]
+              });
+              if (exists) continue;
+
+              const chosenCaller = await pickCallerForTeam(activeCallers, 'North Region Sales', 'ROUND_ROBIN');
+              const created = await Lead.create({
+                name: parsed.name || `Meta Lead ${parsed.metaLeadId}`,
+                mobile: parsed.mobile,
+                email: parsed.email,
+                city: parsed.city,
+                state: parsed.state,
+                business_type: parsed.businessType,
+                product_interest: parsed.productInterest,
+                lead_source: 'Facebook Meta Lead Ads',
+                campaign_name: parsed.campaignName || form.name || '',
+                status: chosenCaller ? 'Assigned' : 'Fresh Lead',
+                assigned_to: chosenCaller ? chosenCaller._id : null,
+                assigned_at: chosenCaller ? new Date() : null,
+                notes: parsed.notes,
+                ...(parsed.createdTime ? { createdAt: parsed.createdTime } : {})
+              });
+
+              newCapturedLeads.push({
+                lead_id: created.lead_id,
+                name: created.name,
+                mobile: created.mobile,
+                campaign: created.campaign_name,
+                assignedTo: chosenCaller ? chosenCaller.name : 'Unassigned'
+              });
+            }
+          }
+        } catch (fetchErr) {
+          console.warn(`Error fetching leads for form ${form.id}:`, fetchErr.message);
+        }
+      }
+
+      // Count real leads in DB per campaign
+      const dbLeadCounts = await Lead.aggregate([
+        { $group: { _id: '$campaign_name', count: { $sum: 1 } } }
+      ]);
+      const dbCountByCamp = new Map();
+      for (const row of dbLeadCounts) {
+        if (row._id) dbCountByCamp.set(String(row._id).toLowerCase(), row.count);
+      }
+
       for (const rc of rawCampaigns) {
         const existing = existingMap.get(rc.id) || {};
         const insight = rc.insights?.data?.[0] || {};
-        const spend = Number(insight.spend || existing.spend || 0);
-        const impressions = Number(insight.impressions || existing.impressions || 0);
-        const clicks = Number(insight.clicks || existing.clicks || 0);
-        const budget = Number(rc.daily_budget ? rc.daily_budget / 100 : (existing.dailyBudget || 250));
+        const spend = Number(insight.spend ?? existing.spend ?? 0);
+        const impressions = Number(insight.impressions ?? existing.impressions ?? 0);
+        const clicks = Number(insight.clicks ?? existing.clicks ?? 0);
+        const budget = rc.daily_budget ? Number(rc.daily_budget) / 100 : (existing.dailyBudget || 0);
 
-        // Find linked form if any
-        const linkedForm = rawForms.find(f =>
-          (f.name || '').toLowerCase().includes((rc.name || '').toLowerCase().split('-')[0].trim()) ||
-          (rc.name || '').toLowerCase().includes((f.name || '').toLowerCase().split('-')[0].trim())
-        ) || rawForms[0];
+        const rcLower = (rc.name || '').toLowerCase();
+        const linkedForm = rawForms.find(f => {
+          const fLower = (f.name || '').toLowerCase();
+          return fLower && rcLower && (fLower.includes(rcLower) || rcLower.includes(fLower));
+        }) || null;
 
         const formId = linkedForm?.id || existing.linkedFormId || '';
-        const formName = linkedForm?.name || existing.linkedFormName || 'Meta Lead Gen Form';
-        const assignedTeam = existing.assignedTeam || (rc.name.includes('Bulk') || rc.name.includes('Distributor') ? 'Bulk Lubricants Ops' : 'North Region Sales');
+        const formName = linkedForm?.name || existing.linkedFormName || '';
+        const assignedTeam = existing.assignedTeam || 'North Region Sales';
         const distributionRule = existing.distributionRule || 'ROUND_ROBIN';
-
-        // 3. Try fetching real leads for this form if token present
-        let formLeadsCount = existing.leadsCount || 0;
-        if (formId && token && token.length > 20) {
-          try {
-            const leadRes = await fetch(
-              `https://graph.facebook.com/v21.0/${formId}/leads?fields=id,created_time,field_data&limit=15&access_token=${token}`
-            );
-            const leadData = await leadRes.json();
-            if (Array.isArray(leadData?.data) && leadData.data.length > 0) {
-              formLeadsCount = Math.max(formLeadsCount, leadData.data.length);
-              for (const fl of leadData.data) {
-                // Parse fields
-                let leadName = 'Meta Lead Prospect';
-                let phone = '';
-                let email = '';
-                let city = 'Indore';
-                let state = 'Madhya Pradesh';
-                let product = 'Mustard Oil (15L Tin)';
-                let notes = `Synced via Meta Ad Campaign: ${rc.name} (Lead ID: ${fl.id})`;
-
-                for (const fd of (fl.field_data || [])) {
-                  const val = Array.isArray(fd.values) ? fd.values[0] : fd.values;
-                  if (!val) continue;
-                  const key = (fd.name || '').toLowerCase();
-                  if (key.includes('name') && !key.includes('company')) leadName = val;
-                  else if (key.includes('phone') || key.includes('mobile')) phone = val;
-                  else if (key.includes('email')) email = val;
-                  else if (key.includes('city')) city = val;
-                  else if (key.includes('state')) state = val;
-                  else if (key.includes('product') || key.includes('oil')) product = val;
-                }
-
-                const cleanedPhone = sanitizePhone(phone);
-                if (cleanedPhone) {
-                  const exists = await Lead.findOne({
-                    $or: [
-                      { mobile: cleanedPhone },
-                      { notes: { $regex: fl.id } }
-                    ]
-                  });
-                  if (!exists) {
-                    const chosenCaller = await pickCallerForTeam(activeCallers, assignedTeam, distributionRule);
-                    const lastLeadDoc = await Lead.findOne({ lead_id: { $regex: /^L-\d+$/ } }).sort({ createdAt: -1 }).lean();
-                    let nextNum = 8205;
-                    if (lastLeadDoc?.lead_id) {
-                      const m = lastLeadDoc.lead_id.match(/^L-(\d+)$/);
-                      if (m) nextNum = parseInt(m[1], 10) + 1;
-                    }
-                    const newLeadId = `L-${nextNum}`;
-
-                    const created = await Lead.create({
-                      lead_id: newLeadId,
-                      name: leadName,
-                      mobile: cleanedPhone,
-                      email: email || `${cleanedPhone}@kisanconnect.meta`,
-                      city,
-                      state,
-                      business_type: 'Distributor',
-                      product_interest: product,
-                      lead_source: 'Facebook Meta Lead Ads',
-                      campaign_name: rc.name,
-                      status: chosenCaller ? 'Assigned' : 'Fresh Lead',
-                      assigned_to: chosenCaller ? chosenCaller._id : null,
-                      assigned_at: chosenCaller ? new Date() : null,
-                      notes
-                    });
-
-                    newCapturedLeads.push({
-                      lead_id: created.lead_id,
-                      name: created.name,
-                      mobile: created.mobile,
-                      campaign: rc.name,
-                      assignedTo: chosenCaller ? chosenCaller.name : 'Unassigned'
-                    });
-                  }
-                }
-              }
-            }
-          } catch (fetchErr) {
-            console.warn(`Error fetching leads for form ${formId}:`, fetchErr.message);
-          }
-        }
+        const leadsCount = dbCountByCamp.get(rcLower) || (linkedForm ? Number(linkedForm.leads_count) || 0 : (existing.leadsCount || 0));
 
         updatedCampaigns.push({
           campaignId: rc.id,
@@ -251,53 +205,52 @@ export async function POST(request) {
           spend,
           impressions,
           clicks,
-          leadsCount: formLeadsCount,
+          leadsCount,
           assignedTeam,
           distributionRule,
           linkedFormId: formId,
           linkedFormName: formName,
           lastSyncAt: new Date()
         });
+      }
 
-        // Also ensure present in customCampaigns
-        const cIdx = (settings.customCampaigns || []).findIndex(cc => cc.name === rc.name);
-        if (cIdx >= 0) {
-          settings.customCampaigns[cIdx].status = rc.status || 'ACTIVE';
-          settings.customCampaigns[cIdx].dailyBudget = budget;
-          settings.customCampaigns[cIdx].team = assignedTeam;
-        } else {
-          settings.customCampaigns.push({
-            name: rc.name,
-            platform: 'META ADS',
-            formName,
-            team: assignedTeam,
-            rule: distributionRule,
-            status: rc.status || 'ACTIVE',
-            dailyBudget: budget,
-            createdAt: new Date()
-          });
-        }
+      const updateFields = {
+        'metaConfig.lastSyncAt': new Date()
+      };
+      if (updatedCampaigns.length > 0) {
+        updateFields.metaCampaigns = updatedCampaigns;
+      }
+      if (rawForms.length > 0) {
+        updateFields.metaForms = rawForms.map(f => ({
+          formId: String(f.id),
+          formName: f.name,
+          pageName: settings.metaConfig?.pageName || 'Kisan Choice',
+          platform: 'Facebook & Instagram Lead Ads',
+          campaignAction: 'existing',
+          campaignName: f.name || '',
+          distributionRule: 'ROUND_ROBIN',
+          assignedTeam: 'North Region Sales',
+          assignedCallerId: '',
+          assignedCallerName: 'Auto Round-Robin',
+          customizeFields: true,
+          active: f.status === 'ACTIVE',
+          leadsCaptured: Number(f.leads_count) || 0,
+          lastLeadAt: null
+        }));
       }
 
       await SystemSetting.findOneAndUpdate(
         { key: 'global' },
-        {
-          $set: {
-            metaCampaigns: updatedCampaigns,
-            customCampaigns: settings.customCampaigns,
-            'metaConfig.lastSyncAt': new Date()
-          }
-        },
+        { $set: updateFields },
         { new: true, upsert: true }
       );
 
-      // Invalidate Next.js cache so fresh data is immediately available
       purgeMetaCache();
       purgeDashboardCache();
 
       return NextResponse.json({
         success: true,
-        message: `Successfully synced ${updatedCampaigns.length} Meta Campaigns & captured ${newCapturedLeads.length} new leads!`,
+        message: `Synced ${updatedCampaigns.length} Meta Campaigns & ${newCapturedLeads.length} new leads from Meta Graph API.`,
         syncedCampaignsCount: updatedCampaigns.length,
         syncedLeadsCount: newCapturedLeads.length,
         campaigns: updatedCampaigns,
@@ -314,10 +267,9 @@ export async function POST(request) {
         if (status) settings.metaCampaigns[idx].status = status;
         if (dailyBudget !== undefined) settings.metaCampaigns[idx].dailyBudget = Number(dailyBudget);
 
-        // Also push status toggle directly to Meta Graph API
         if (status && token) {
           try {
-            await fetch(`https://graph.facebook.com/v21.0/${campaignId}?access_token=${token}`, {
+            await fetch(`https://graph.facebook.com/v21.0/${campaignId}?access_token=${encodeURIComponent(token)}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ status })
@@ -339,18 +291,40 @@ export async function POST(request) {
       const { campaignId, boostMultiplier = 1.5, newBudget, activateIfPaused = true } = body;
       const idx = (settings.metaCampaigns || []).findIndex(c => c.campaignId === campaignId);
       if (idx >= 0) {
-        const currentBudget = settings.metaCampaigns[idx].dailyBudget || 300;
-        const targetBudget = newBudget ? Number(newBudget) : Math.round(currentBudget * Number(boostMultiplier));
+        let baseBudget = Number(settings.metaCampaigns[idx].dailyBudget) || 0;
+
+        // If campaign uses AdSet-level budget (dailyBudget === 0) and no explicit newBudget was entered, read live AdSet daily_budget
+        if (!newBudget && baseBudget === 0 && token && token.length > 20) {
+          try {
+            const adsetsCheck = await fetch(
+              `https://graph.facebook.com/v21.0/${campaignId}/adsets?fields=id,daily_budget&access_token=${encodeURIComponent(token)}`,
+              { cache: 'no-store' }
+            );
+            const adsetsJson = await adsetsCheck.json();
+            const firstWithBudget = (adsetsJson?.data || []).find(a => Number(a.daily_budget) > 0);
+            if (firstWithBudget) {
+              baseBudget = Number(firstWithBudget.daily_budget) / 100;
+            }
+          } catch {}
+        }
+
+        const targetBudget = newBudget ? Number(newBudget) : Math.round(baseBudget * Number(boostMultiplier));
+        if (!targetBudget || targetBudget <= 0) {
+          return NextResponse.json(
+            { error: 'This campaign uses AdSet-level budgeting without a base daily budget. Enter a custom daily budget (INR) to scale.' },
+            { status: 400 }
+          );
+        }
+
         settings.metaCampaigns[idx].dailyBudget = targetBudget;
         if (activateIfPaused) {
           settings.metaCampaigns[idx].status = 'ACTIVE';
         }
 
-        // Attempt live budget and status update on Meta Graph API
         let metaGraphUpdated = false;
         if (token && token.length > 20) {
           try {
-            const metaRes = await fetch(`https://graph.facebook.com/v21.0/${campaignId}?access_token=${token}`, {
+            const metaRes = await fetch(`https://graph.facebook.com/v21.0/${campaignId}?access_token=${encodeURIComponent(token)}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -361,13 +335,15 @@ export async function POST(request) {
             const metaJson = await metaRes.json();
             metaGraphUpdated = metaJson.success === true;
 
-            // If campaign update failed because budget is defined on ad set level, update active ad sets!
             if (!metaGraphUpdated && metaJson.error) {
-              const adsetsRes = await fetch(`https://graph.facebook.com/v21.0/${campaignId}/adsets?fields=id,name,daily_budget&access_token=${token}`);
+              const adsetsRes = await fetch(
+                `https://graph.facebook.com/v21.0/${campaignId}/adsets?fields=id,name,daily_budget&access_token=${encodeURIComponent(token)}`,
+                { cache: 'no-store' }
+              );
               const adsetsData = await adsetsRes.json();
               if (Array.isArray(adsetsData?.data) && adsetsData.data.length > 0) {
                 for (const adset of adsetsData.data) {
-                  await fetch(`https://graph.facebook.com/v21.0/${adset.id}?access_token=${token}`, {
+                  await fetch(`https://graph.facebook.com/v21.0/${adset.id}?access_token=${encodeURIComponent(token)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -391,7 +367,7 @@ export async function POST(request) {
           success: true,
           metaGraphUpdated,
           campaign: settings.metaCampaigns[idx],
-          message: `Campaign "${settings.metaCampaigns[idx].name}" boosted to ₹${targetBudget}/day (${settings.metaCampaigns[idx].status})!`
+          message: `Campaign "${settings.metaCampaigns[idx].name}" scaled to ₹${targetBudget}/day (${settings.metaCampaigns[idx].status}).`
         });
       }
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
@@ -399,16 +375,19 @@ export async function POST(request) {
 
     if (body.action === 'SAVE_CAMPAIGN_GOAL') {
       const { campaignId, campaignName, targetLeadsDaily, targetCostPerLead, targetMonthlyBudget, slaTargetMinutes, conversionRateTarget, notes } = body;
+      if (!campaignId) {
+        return NextResponse.json({ error: 'campaignId is required' }, { status: 400 });
+      }
       const goals = settings.campaignGoals || [];
       const gIdx = goals.findIndex(g => g.campaignId === campaignId);
       const goalObj = {
         campaignId,
-        campaignName: campaignName || 'Meta Campaign',
-        targetLeadsDaily: Number(targetLeadsDaily) || 25,
-        targetCostPerLead: Number(targetCostPerLead) || 30,
-        targetMonthlyBudget: Number(targetMonthlyBudget) || 15000,
+        campaignName: campaignName || '',
+        targetLeadsDaily: Number(targetLeadsDaily) || 0,
+        targetCostPerLead: Number(targetCostPerLead) || 0,
+        targetMonthlyBudget: Number(targetMonthlyBudget) || 0,
         slaTargetMinutes: Number(slaTargetMinutes) || 15,
-        conversionRateTarget: Number(conversionRateTarget) || 12,
+        conversionRateTarget: Number(conversionRateTarget) || 0,
         notes: notes || '',
         updatedAt: new Date()
       };
@@ -426,7 +405,7 @@ export async function POST(request) {
       return NextResponse.json({
         success: true,
         goal: goalObj,
-        message: `Campaign goal for "${goalObj.campaignName}" saved successfully!`
+        message: `Campaign goal for "${goalObj.campaignName}" saved.`
       });
     }
 

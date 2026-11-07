@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getCachedDashboardData, getCacheHeaders } from '../../../lib/cache';
+import { requireAdminApi } from '../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   try {
+    if (!(await requireAdminApi(request))) {
+      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    }
     const data = await getCachedDashboardData();
     return NextResponse.json(data, {
       headers: getCacheHeaders(15, 60)

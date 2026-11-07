@@ -1,19 +1,24 @@
 import './globals.css';
-import Sidebar from '../components/Sidebar';
+import { AuthProvider } from '../components/AuthProvider';
 
 export const metadata = {
-  title: 'KisanConnect CRM - Telecalling & Lead Management Platform',
-  description: 'Enterprise monitoring dashboard for lead ingestion, telecaller activity, and campaign tracking.',
+  title: 'Kisan India CRM — Telecalling & Lead Operations Platform',
+  description: 'Enterprise workspace for Meta Lead Ads capture, telecaller operations, campaign pacing, and performance analytics.',
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className="flex min-h-screen bg-[#F8FAFC] antialiased text-slate-800 font-sans selection:bg-blue-600 selection:text-white">
-        <Sidebar />
-        <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
-          {children}
-        </div>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="min-h-screen bg-[#F8FAFC] antialiased text-slate-900 font-sans selection:bg-blue-600 selection:text-white">
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

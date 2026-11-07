@@ -29,7 +29,7 @@ export default function FollowupsPage() {
     callerId: '',
     date: new Date().toISOString().split('T')[0],
     time: '11:30 AM',
-    notes: 'Callback regarding 15L Mustard Oil wholesale quotation'
+    notes: ''
   });
 
   const fetchFollowups = useCallback(async () => {
@@ -200,7 +200,7 @@ export default function FollowupsPage() {
                     callerId: telecallers[0]?.id || '',
                     date: new Date().toISOString().split('T')[0],
                     time: '02:30 PM',
-                    notes: 'Follow-up on bulk Mustard Oil 15L tin order'
+                    notes: ''
                   });
                   setShowAddModal(true);
                 }}

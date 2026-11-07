@@ -11,14 +11,11 @@ import {
   Zap,
   Loader2,
   X,
-  ExternalLink,
   RefreshCw,
-  Sparkles,
+  FileSpreadsheet,
   DollarSign,
   Layers,
-  Facebook,
-  ShieldCheck,
-  Check
+  Facebook
 } from 'lucide-react';
 
 export default function CampaignsPage() {
@@ -30,15 +27,15 @@ export default function CampaignsPage() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
-  const [activeTab, setActiveTab] = useState('META_SYNC'); // 'META_SYNC' | 'ALL_CAMPAIGNS'
+  const [activeTab, setActiveTab] = useState('META_SYNC');
 
   const [newCamp, setNewCamp] = useState({
     name: '',
     platform: 'META ADS',
-    formName: 'KisanChoice Lead Form 2026 (Hindi + English)',
+    formName: '',
     team: 'North Region Sales',
     rule: 'Round-Robin',
-    dailyBudget: 3000
+    dailyBudget: 500
   });
 
   const showToast = (msg) => {
@@ -69,7 +66,6 @@ export default function CampaignsPage() {
     fetchCampaigns();
   }, [fetchCampaigns]);
 
-  // 1-Click Sync All Campaigns directly from Meta Ads Account
   const handleSyncAllFromMeta = async () => {
     setSyncingMeta(true);
     try {
@@ -80,7 +76,7 @@ export default function CampaignsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`🎉 ${data.message || `Synced ${data.syncedCampaignsCount} campaigns & fresh leads from Meta!`}`);
+        showToast(data.message || `Synced ${data.syncedCampaignsCount} campaigns & fresh leads from Meta.`);
         fetchCampaigns();
       } else {
         showToast(`Sync alert: ${data.error || 'Failed to sync from Meta'}`);
@@ -93,7 +89,6 @@ export default function CampaignsPage() {
     }
   };
 
-  // Inline team assignment update
   const handleUpdateCampaignTeam = async (campaignId, teamName) => {
     try {
       await fetch('/api/meta/campaigns', {
@@ -121,12 +116,12 @@ export default function CampaignsPage() {
       const updatedCustom = [
         {
           name: newCamp.name.trim(),
-          platform: newCamp.platform,
-          formName: newCamp.formName,
-          team: newCamp.team,
+          platform: 'META ADS',
+          formName: newCamp.formName.trim(),
+          team: newCamp.team.trim() || 'North Region Sales',
           rule: newCamp.rule,
           status: 'ACTIVE',
-          dailyBudget: Number(newCamp.dailyBudget) || 2500
+          dailyBudget: Number(newCamp.dailyBudget) || 500
         },
         ...existingCustom
       ];
@@ -141,12 +136,12 @@ export default function CampaignsPage() {
       setNewCamp({
         name: '',
         platform: 'META ADS',
-        formName: 'KisanChoice Lead Form 2026 (Hindi + English)',
+        formName: '',
         team: 'North Region Sales',
         rule: 'Round-Robin',
-        dailyBudget: 3000
+        dailyBudget: 500
       });
-      showToast('Campaign successfully created and linked to team routing.');
+      showToast('Campaign created and linked to Meta Lead Ads team routing.');
       fetchCampaigns();
     } catch (err) {
       console.error(err);
@@ -157,9 +152,9 @@ export default function CampaignsPage() {
 
   const metaList = metaData?.campaigns || [];
   const totalLeads = campaigns.reduce((acc, c) => acc + (c.total || 0), 0);
-  const totalInterested = campaigns.reduce((acc, c) => acc + (c.interested || 0), 0);
-  const totalConverted = campaigns.reduce((acc, c) => acc + (c.converted || 0), 0);
-  const avgRate = totalLeads > 0 ? ((totalInterested / totalLeads) * 100).toFixed(1) : '0.0';
+  const availableTeams = settings?.teams?.length
+    ? settings.teams
+    : [{ name: 'North Region Sales' }];
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
@@ -175,7 +170,7 @@ export default function CampaignsPage() {
               <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
               <span>{toastMessage}</span>
             </div>
-            <button onClick={() => setToastMessage(null)} className="text-emerald-700 hover:text-emerald-900">
+            <button onClick={() => setToastMessage(null)} className="text-emerald-700 hover:text-emerald-900 cursor-pointer">
               <X size={14} />
             </button>
           </div>
@@ -201,7 +196,7 @@ export default function CampaignsPage() {
                 </span>
               </div>
               <p className="text-xs text-slate-600 mt-1 font-medium">
-                Live synchronization of all ad campaigns, leadgen forms, and historical leads into MongoDB with automatic round-robin routing.
+                Live synchronization of all ad campaigns, leadgen forms, and prospect leads into MongoDB with automatic round-robin routing.
               </p>
             </div>
           </div>
@@ -238,7 +233,7 @@ export default function CampaignsPage() {
               href="/browser"
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 text-purple-700 border border-purple-200/80 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
             >
-              <Sparkles size={14} className="text-purple-600" /> Forms Browser
+              <FileSpreadsheet size={14} className="text-purple-600" /> Forms Browser
             </Link>
             <Link
               href="/settings"
@@ -320,7 +315,7 @@ export default function CampaignsPage() {
             }`}
           >
             <Layers size={14} className={activeTab === 'ALL_CAMPAIGNS' ? 'text-purple-100' : 'text-purple-600'} />
-            All Multi-Channel Pipelines ({campaigns.length})
+            Campaign Pipeline Conversion ({campaigns.length})
           </button>
         </div>
 
@@ -442,9 +437,9 @@ export default function CampaignsPage() {
                             onChange={(e) => handleUpdateCampaignTeam(camp.campaignId, e.target.value)}
                             className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                           >
-                            <option value="North Region Sales">North Region Sales</option>
-                            <option value="Bulk Lubricants Ops">Bulk Lubricants Ops</option>
-                            <option value="Field Ops & Followup">Field Ops & Followup</option>
+                            {availableTeams.map((t, ti) => (
+                              <option key={ti} value={t.name}>{t.name}</option>
+                            ))}
                           </select>
                         </td>
                         <td className="py-4 px-6 whitespace-nowrap">
@@ -469,13 +464,13 @@ export default function CampaignsPage() {
           </div>
         )}
 
-        {/* TAB 2: All Multi-Channel Pipelines Table */}
+        {/* TAB 2: Campaign Pipeline Conversion Table */}
         {activeTab === 'ALL_CAMPAIGNS' && (
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-heading font-bold text-slate-900">All Ingestion Channels</h3>
-                <p className="text-xs text-slate-500 mt-0.5 font-medium">Aggregated across WhatsApp, Meta, Google Sheets & Web</p>
+                <h3 className="text-base font-heading font-bold text-slate-900">Meta Lead Ads Campaign Pipelines</h3>
+                <p className="text-xs text-slate-500 mt-0.5 font-medium">Aggregated conversion performance across Facebook & Instagram Lead Ads campaigns</p>
               </div>
               <button
                 onClick={() => setShowModal(true)}
@@ -500,37 +495,41 @@ export default function CampaignsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {campaigns.map((camp) => (
-                    <tr key={camp.id || camp.name} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-4 px-6">
-                        <p className="font-semibold text-slate-900 text-sm">{camp.name}</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5 font-normal">Form: {camp.formName || 'Meta Lead Ads'}</p>
-                      </td>
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <span className={`inline-block px-2.5 py-1 rounded-lg border text-[10px] font-semibold tracking-wider ${
-                          camp.platform?.includes('META')
-                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        }`}>
-                          {camp.platform}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 font-bold text-slate-900 tabular-nums">{camp.total}</td>
-                      <td className="py-4 px-6 font-semibold text-indigo-600 tabular-nums">{camp.interested || 0}</td>
-                      <td className="py-4 px-6 font-semibold text-emerald-600 tabular-nums">{camp.converted}</td>
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold text-[11px] tabular-nums">
-                          {camp.rate}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 font-medium text-slate-700">{camp.team}</td>
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-medium text-[11px]">
-                          {camp.rule}
-                        </span>
+                  {campaigns.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="py-12 text-center text-slate-400 font-medium">
+                        No campaign lead pipelines recorded yet.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    campaigns.map((camp) => (
+                      <tr key={camp.id || camp.name} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-4 px-6">
+                          <p className="font-semibold text-slate-900 text-sm">{camp.name}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 font-normal">Form: {camp.formName || 'Meta Lead Ads'}</p>
+                        </td>
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <span className="inline-block px-2.5 py-1 rounded-lg border text-[10px] font-semibold tracking-wider bg-blue-50 text-blue-700 border-blue-200">
+                            {camp.platform || 'META ADS'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 font-bold text-slate-900 tabular-nums">{camp.total}</td>
+                        <td className="py-4 px-6 font-semibold text-indigo-600 tabular-nums">{camp.interested || 0}</td>
+                        <td className="py-4 px-6 font-semibold text-emerald-600 tabular-nums">{camp.converted}</td>
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold text-[11px] tabular-nums">
+                            {camp.rate}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 font-medium text-slate-700">{camp.team}</td>
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-medium text-[11px]">
+                            {camp.rule}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -549,8 +548,8 @@ export default function CampaignsPage() {
               <X size={16} />
             </button>
             <div>
-              <h3 className="text-lg font-heading font-bold text-slate-900">Create & Link Campaign</h3>
-              <p className="text-xs text-slate-500 font-medium">Connects a Meta Lead Form or ad source to a telecalling team</p>
+              <h3 className="text-lg font-heading font-bold text-slate-900">Create & Link Meta Campaign</h3>
+              <p className="text-xs text-slate-500 font-medium">Connects a Meta Lead Ads form to a telecalling team</p>
             </div>
             <form onSubmit={handleCreateCampaign} className="space-y-3.5 text-xs">
               <div>
@@ -560,7 +559,7 @@ export default function CampaignsPage() {
                   required
                   value={newCamp.name}
                   onChange={e => setNewCamp({ ...newCamp, name: e.target.value })}
-                  placeholder="e.g. Gujarat & MP Mustard Oil Tin Campaign"
+                  placeholder="Enter Meta Lead Ads campaign name"
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
@@ -573,8 +572,6 @@ export default function CampaignsPage() {
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   >
                     <option value="META ADS">META ADS (FB/IG)</option>
-                    <option value="WEBSITE FORM">WEBSITE FORM</option>
-                    <option value="WHATSAPP API">WHATSAPP API</option>
                   </select>
                 </div>
                 <div>
@@ -595,6 +592,7 @@ export default function CampaignsPage() {
                   type="text"
                   value={newCamp.formName}
                   onChange={e => setNewCamp({ ...newCamp, formName: e.target.value })}
+                  placeholder="Optional Meta Lead Form name"
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
@@ -605,11 +603,7 @@ export default function CampaignsPage() {
                   onChange={e => setNewCamp({ ...newCamp, team: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
-                  {(settings?.teams || [
-                    { name: 'North Region Sales' },
-                    { name: 'Bulk Lubricants Ops' },
-                    { name: 'Field Ops & Followup' }
-                  ]).map((t, i) => (
+                  {availableTeams.map((t, i) => (
                     <option key={i} value={t.name}>{t.name}</option>
                   ))}
                 </select>

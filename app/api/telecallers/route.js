@@ -3,18 +3,19 @@ import connectDB from '../../../lib/db';
 import User from '../../../lib/models/User';
 import Lead from '../../../lib/models/Lead';
 import Call from '../../../lib/models/Call';
-import { ensureInitialCRMData } from '../../../lib/settings';
+import { hashPassword, requireAdminApi } from '../../../lib/auth';
+import { purgeDashboardCache } from '../../../lib/cache';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   try {
+    if (!(await requireAdminApi(request))) {
+      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    }
     await connectDB();
-    await ensureInitialCRMData();
 
     const callers = await User.find({ role: 'telecaller' }).select('-password').sort({ createdAt: 1 }).lean();
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
 
     const enriched = await Promise.all(
       callers.map(async (tc) => {
@@ -64,15 +65,14 @@ export async function GET() {
           followups: followupsCount,
           closed: closedDeals,
           targetConversions: tc.daily_conversion_target || 5,
-          loginTime: tc.last_clock_in ? new Date(tc.last_clock_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '09:30 AM',
+          loginTime: tc.last_clock_in ? new Date(tc.last_clock_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--',
           logoutTime: tc.last_clock_out ? new Date(tc.last_clock_out).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--',
-          lastActivity: tc.last_active_at ? new Date(tc.last_active_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Active',
+          lastActivity: tc.last_active_at ? new Date(tc.last_active_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--',
           avgCallDurationSec: avgDuration
         };
       })
     );
 
-    // Recent audit logs from real Calls and Leads
     const [recentCalls, recentAssignedLeads] = await Promise.all([
       Call.find({}).populate('caller', 'name').populate('lead', 'name lead_id mobile').sort({ createdAt: -1 }).limit(8).lean(),
       Lead.find({ assigned_to: { $ne: null } }).populate('assigned_to', 'name').sort({ updatedAt: -1 }).limit(6).lean()
@@ -97,7 +97,7 @@ export async function GET() {
         timestamp: new Date(l.updatedAt || l.createdAt).getTime(),
         agent: l.assigned_to?.name || 'System Router',
         action: 'Lead Pipeline Assigned',
-        details: `${l.lead_id} (${l.name} - ${l.city || 'India'}) status is ${l.status}`
+        details: `${l.lead_id} (${l.name}${l.city ? ` - ${l.city}` : ''}) status is ${l.status}`
       });
     });
 
@@ -116,28 +116,19 @@ export async function POST(request) {
     const body = await request.json();
     const { name, mobile, email, team, targetCalls, targetConversions, password } = body;
 
-    if (!name || !mobile) {
-      return NextResponse.json({ error: 'Name and mobile are required' }, { status: 400 });
+    if (!name || !mobile || !password) {
+      return NextResponse.json({ error: 'Name, mobile, and password are required' }, { status: 400 });
     }
 
     const count = await User.countDocuments();
     const employee_id = body.employee_id || `EMP${100 + count + 1}`;
-    const cleanEmail = email || `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}${count + 1}@kisanconnect.com`;
+    const cleanEmail = (email || '').trim() || `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}${count + 1}@kisanindia.com`;
 
-    // Hash password compatible with bcryptjs in backend ($2a$10$...)
-    // Using backend's bcryptjs if available or simple fallback hash
-    let hashedPassword = password || 'password123';
-    try {
-      const bcryptPath = 'i:/call-app/caller-app-backned/node_modules/bcryptjs';
-      const bcrypt = eval('require')(bcryptPath);
-      hashedPassword = await bcrypt.hash(password || 'password123', 10);
-    } catch {
-      // fallback
-    }
+    const hashedPassword = await hashPassword(password);
 
     const created = await User.create({
-      name,
-      mobile,
+      name: String(name).trim(),
+      mobile: String(mobile).trim(),
       email: cleanEmail,
       employee_id,
       password: hashedPassword,
@@ -150,6 +141,7 @@ export async function POST(request) {
       daily_conversion_target: Number(targetConversions) || 5
     });
 
+    purgeDashboardCache();
     return NextResponse.json({ success: true, telecaller: created }, { status: 201 });
   } catch (error) {
     console.error('Telecaller POST error:', error);
@@ -182,6 +174,7 @@ export async function PATCH(request) {
     if (team !== undefined) update.team = team;
 
     const updated = await User.findByIdAndUpdate(id, { $set: update }, { new: true }).select('-password');
+    purgeDashboardCache();
     return NextResponse.json({ success: true, telecaller: updated });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

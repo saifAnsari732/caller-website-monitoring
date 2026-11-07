@@ -3,14 +3,17 @@ import connectDB from '../../../lib/db';
 import Followup from '../../../lib/models/Followup';
 import Lead from '../../../lib/models/Lead';
 import User from '../../../lib/models/User';
-import { ensureInitialCRMData } from '../../../lib/settings';
+import { purgeDashboardCache } from '../../../lib/cache';
+import { requireAdminApi } from '../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   try {
+    if (!(await requireAdminApi(request))) {
+      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    }
     await connectDB();
-    await ensureInitialCRMData();
     const todayStr = new Date().toISOString().split('T')[0];
 
     const [followups, leads, telecallers] = await Promise.all([
@@ -54,18 +57,18 @@ export async function GET() {
       return {
         id: f._id.toString(),
         leadId: f.lead?._id?.toString() || '',
-        leadCode: f.lead?.lead_id || 'L-00',
-        client: f.lead?.name || 'Unknown Prospect',
+        leadCode: f.lead?.lead_id || '',
+        client: f.lead?.name || '—',
         mobile: f.lead?.mobile || '',
-        city: f.lead?.city || 'India',
-        businessType: f.lead?.business_type || 'Distributor',
-        productInterest: f.lead?.product_interest || 'Oil Inquiry',
+        city: f.lead?.city || '',
+        businessType: f.lead?.business_type || '',
+        productInterest: f.lead?.product_interest || '',
         agent: f.caller?.name || 'Unassigned',
-        agentTeam: f.caller?.team || 'Sales',
+        agentTeam: f.caller?.team || '',
         date: f.date,
         time: `${f.date} at ${f.time}`,
         rawTime: f.time,
-        notes: f.notes || 'Scheduled callback',
+        notes: f.notes || '',
         bucket,
         status: statusLabel,
         completed: Boolean(f.completed)
@@ -97,11 +100,12 @@ export async function POST(request) {
       caller: callerId,
       date,
       time,
-      notes: notes || 'Follow-up scheduled by Admin',
+      notes: notes || '',
       completed: false
     });
 
     await Lead.findByIdAndUpdate(leadId, { $set: { status: 'Follow Up' } });
+    purgeDashboardCache();
 
     return NextResponse.json({ success: true, followup: created }, { status: 201 });
   } catch (error) {
@@ -126,6 +130,7 @@ export async function PATCH(request) {
       { $set: update },
       { new: true }
     );
+    purgeDashboardCache();
     return NextResponse.json({ success: true, followup: updated });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -18,20 +18,8 @@ import {
 export default function SystemHealthPage() {
   const [status, setStatus] = useState(null);
   const [testing, setTesting] = useState(false);
-  const [latency, setLatency] = useState(78);
-  const [testLogs, setTestLogs] = useState([
-    `[SYSTEM READY] MongoDB Atlas & Meta Graph v21.0 Webhook Listener Online.`,
-    `[PAGE BOUND] Facebook Page: Kisan Choice (ID: 933429549844450).`,
-    `[AD ACCOUNT] act_1796071777698019 • Currency: INR.`,
-    `[ZERO-LOSS ENGINE] Active — Foreign or malformed phone numbers preserved with [Urgent] tag.`
-  ]);
-
-  useEffect(() => {
-    fetch('/api/meta/status')
-      .then(r => r.json())
-      .then(d => setStatus(d))
-      .catch(() => {});
-  }, []);
+  const [latency, setLatency] = useState(null);
+  const [testLogs, setTestLogs] = useState([]);
 
   const runMetaGraphDiagnostics = async () => {
     setTesting(true);
@@ -41,6 +29,7 @@ export default function SystemHealthPage() {
       const elapsed = Date.now() - t0;
       setLatency(elapsed);
       const data = await res.json();
+      setStatus(data);
 
       const time = new Date().toLocaleTimeString();
       if (res.ok) {
@@ -58,11 +47,15 @@ export default function SystemHealthPage() {
     }
   };
 
+  useEffect(() => {
+    runMetaGraphDiagnostics();
+  }, []);
+
   const runWebhookHandshake = async () => {
     setTesting(true);
     const t0 = Date.now();
     try {
-      const token = status?.verifyToken || 'OILFLOW_CRM_SECRET_2026';
+      const token = status?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY';
       const res = await fetch(`/api/webhooks/meta?hub.mode=subscribe&hub.challenge=KISAN_TEST_CHALLENGE_${Date.now()}&hub.verify_token=${encodeURIComponent(token)}`);
       const elapsed = Date.now() - t0;
       const text = await res.text();
@@ -88,7 +81,7 @@ export default function SystemHealthPage() {
         subtitle="Benchmark real Meta Graph API response latency, audit live Webhook handshakes & monitor MongoDB Atlas lead ingestion"
       />
 
-      <main className="p-6 lg:p-8 space-y-6 flex-1 max-w-7xl mx-auto w-full">
+      <main className="px-5 lg:px-7 py-6 space-y-6 flex-1 w-full max-w-none">
         {/* Status Indicators */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
@@ -97,7 +90,7 @@ export default function SystemHealthPage() {
               <h4 className="font-heading font-bold text-slate-900 text-sm">Meta Webhook & OAuth Status</h4>
             </div>
             <p className="text-xs text-slate-500 font-medium">
-              Verify Token: <code className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-mono border border-blue-200/60">{status?.verifyToken || 'OILFLOW_CRM_SECRET_2026'}</code>
+              Verify Token: <code className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-mono border border-blue-200/60">{status?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY'}</code>
             </p>
             <p className="text-[11px] text-emerald-600 font-bold mt-2">
               Page: {status?.pageName || 'Kisan Choice'} (ID: {status?.pageId || '933429549844450'})
@@ -120,7 +113,7 @@ export default function SystemHealthPage() {
               <h4 className="font-heading font-bold text-slate-900 text-sm">Live Ingestion Latency</h4>
             </div>
             <p className="text-xs text-slate-500 font-medium">
-              Meta Graph Round-Trip: <strong className="text-slate-900 text-base font-heading font-bold tabular-nums">{latency}ms</strong>
+              Meta Graph Round-Trip: <strong className="text-slate-900 text-base font-heading font-bold tabular-nums">{latency !== null ? `${latency}ms` : 'Measuring...'}</strong>
             </p>
           </div>
         </div>

@@ -26,7 +26,7 @@ export default function DistributionPage() {
     name: '',
     source: 'Facebook Meta Lead Ads',
     matchField: 'state',
-    matchValue: 'Madhya Pradesh',
+    matchValue: '',
     strategy: 'Cyclic Round-Robin',
     targetTeam: 'North Region Sales'
   });
@@ -180,7 +180,7 @@ export default function DistributionPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
               <h3 className="text-base font-extrabold text-slate-900">Configured Auto-Assignment Rules</h3>
-              <p className="text-xs text-slate-500">Evaluated in real time whenever a Meta Lead Ad or CSV lead is captured</p>
+              <p className="text-xs text-slate-500">Evaluated in real time whenever a Meta Lead Ad is captured</p>
             </div>
             <button
               onClick={() => setShowModal(true)}
@@ -208,6 +208,12 @@ export default function DistributionPage() {
                     <td colSpan="6" className="py-10 text-center text-slate-400">
                       <Loader2 size={20} className="animate-spin mx-auto mb-2 text-rose-600" />
                       Loading routing rules...
+                    </td>
+                  </tr>
+                ) : rules.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="py-10 text-center text-slate-500 font-medium">
+                      No custom routing rules configured yet. Global distribution strategy is active.
                     </td>
                   </tr>
                 ) : (
@@ -259,7 +265,7 @@ export default function DistributionPage() {
                   required
                   value={newRule.name}
                   onChange={e => setNewRule({ ...newRule, name: e.target.value })}
-                  placeholder="e.g. MP Mustard Oil Leads -> North Region"
+                  placeholder="Enter routing rule name"
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
                 />
               </div>
@@ -283,7 +289,7 @@ export default function DistributionPage() {
                     type="text"
                     value={newRule.matchValue}
                     onChange={e => setNewRule({ ...newRule, matchValue: e.target.value })}
-                    placeholder="Madhya Pradesh"
+                    placeholder="Enter match value"
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
                   />
                 </div>
@@ -307,11 +313,7 @@ export default function DistributionPage() {
                     onChange={e => setNewRule({ ...newRule, targetTeam: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
                   >
-                    {(teams.length > 0 ? teams : [
-                      { name: 'North Region Sales' },
-                      { name: 'Bulk Lubricants Ops' },
-                      { name: 'Field Ops & Followup' }
-                    ]).map((t, i) => (
+                    {(teams.length > 0 ? teams : [{ name: 'North Region Sales' }]).map((t, i) => (
                       <option key={i} value={t.name}>{t.name}</option>
                     ))}
                   </select>

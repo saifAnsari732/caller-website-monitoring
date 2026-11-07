@@ -26,12 +26,12 @@ import {
   Filter,
   CheckSquare,
   Square,
-  Sparkles,
   SlidersHorizontal,
   Layers,
   ChevronDown,
   ArrowUpDown,
-  Share2
+  Share2,
+  Star
 } from 'lucide-react';
 
 const STATUS_STYLES = {
@@ -82,7 +82,7 @@ export default function Dashboard() {
   const [campaignFilter, setCampaignFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [callerFilter, setCallerFilter] = useState('');
-  const [quickPreset, setQuickPreset] = useState('ALL'); // 'ALL' | 'META' | 'WHATSAPP' | 'FRESH' | 'UNASSIGNED' | 'SLA' | 'HOT'
+  const [quickPreset, setQuickPreset] = useState('ALL'); // 'ALL' | 'META' | 'FRESH' | 'UNASSIGNED' | 'SLA' | 'HOT'
 
   // Bulk Selection & Assignment States
   const [selectedLeadIds, setSelectedLeadIds] = useState([]);
@@ -99,9 +99,9 @@ export default function Dashboard() {
   const [newLeadForm, setNewLeadForm] = useState({
     name: '',
     mobile: '',
-    city: 'Indore',
-    business_type: 'Distributor',
-    product_interest: 'Mustard Oil (15L Tin)'
+    city: '',
+    business_type: '',
+    product_interest: ''
   });
   const [savingLead, setSavingLead] = useState(false);
 
@@ -110,7 +110,7 @@ export default function Dashboard() {
     callerId: '',
     duration: 120,
     status: 'Interested',
-    notes: 'Client interested in dealership & wholesale rates.'
+    notes: ''
   });
   const [savingCall, setSavingCall] = useState(false);
 
@@ -170,7 +170,7 @@ export default function Dashboard() {
       const res = await fetch('/api/meta/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_FORM_LEADS', count: 3 })
+        body: JSON.stringify({ action: 'SYNC_FORM_LEADS', count: 25 })
       });
       const json = await res.json();
       if (json.success) {
@@ -203,9 +203,9 @@ export default function Dashboard() {
         setNewLeadForm({
           name: '',
           mobile: '',
-          city: 'Indore',
-          business_type: 'Distributor',
-          product_interest: 'Mustard Oil (15L Tin)'
+          city: '',
+          business_type: '',
+          product_interest: ''
         });
         showToast(`Lead created successfully! Assigned to: ${json.lead?.assigned_to?.name || 'Telecaller'}`);
         fetchDashboard();
@@ -220,10 +220,10 @@ export default function Dashboard() {
   const openDialerForLead = (lead) => {
     setDialTargetLead(lead);
     setDialerForm({
-      callerId: data?.team?.[0]?.id || '',
-      duration: 135,
+      callerId: lead.assignedToId || data?.team?.[0]?.id || '',
+      duration: 120,
       status: 'Interested',
-      notes: `Discussion with ${lead.name} regarding ${lead.product_interest || lead.productInterest || 'bulk orders'}.`
+      notes: ''
     });
     setShowDialerModal(true);
   };
@@ -317,7 +317,7 @@ export default function Dashboard() {
         const callerName = bulkCallerId === 'ROUND_ROBIN'
           ? 'Auto Round-Robin Pool'
           : team.find(t => t.id === bulkCallerId)?.name || 'Selected Telecaller';
-        showToast(`⚡ Assigned ${selectedLeadIds.length} captured leads to ${callerName}!`);
+        showToast(`Assigned ${selectedLeadIds.length} captured leads to ${callerName}!`);
         setSelectedLeadIds([]);
         setBulkCallerId('ROUND_ROBIN');
         fetchDashboard();
@@ -497,27 +497,11 @@ export default function Dashboard() {
   // Helper to render source badge
   const renderSourceBadge = (source) => {
     const s = String(source || '').toLowerCase();
-    if (s.includes('meta') || s.includes('facebook')) {
+    if (s.includes('meta') || s.includes('facebook') || s.includes('instagram')) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/90 shadow-2xs whitespace-nowrap">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
           Facebook Meta Ads
-        </span>
-      );
-    }
-    if (s.includes('whatsapp')) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-2xs whitespace-nowrap">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-          WhatsApp API
-        </span>
-      );
-    }
-    if (s.includes('sheet') || s.includes('google')) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/90 shadow-2xs whitespace-nowrap">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
-          Google Sheets
         </span>
       );
     }
@@ -845,7 +829,7 @@ export default function Dashboard() {
                         : 'bg-emerald-50/80 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
                     }`}
                   >
-                    ⭐ Hot / Interested ({presetCounts.HOT})
+                    <Star size={13} className="shrink-0" /> Hot / Interested ({presetCounts.HOT})
                   </button>
                 </div>
 
@@ -967,10 +951,10 @@ export default function Dashboard() {
                       onChange={(e) => setBulkCallerId(e.target.value)}
                       className="px-3.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
                     >
-                      <option value="ROUND_ROBIN">⚡ Auto Round-Robin Pool (Distribute Evenly)</option>
+                      <option value="ROUND_ROBIN">Auto Round-Robin Pool (Distribute Evenly)</option>
                       {team.map(t => (
                         <option key={t.id} value={t.id}>
-                          👤 {t.name} ({t.status === 'Online' ? 'Active' : t.status})
+                          {t.name} ({t.status === 'Online' ? 'Active' : t.status})
                         </option>
                       ))}
                     </select>
@@ -1083,7 +1067,7 @@ export default function Dashboard() {
                                 <span className="font-semibold tabular-nums">+91 {lead.mobile}</span>
                               </div>
                               <span className="block text-[10px] text-slate-400 mt-0.5">
-                                {lead.city || 'Indore'} • {lead.business_type || 'Trader'}
+                                {[lead.city, lead.business_type].filter(Boolean).join(' • ') || '—'}
                               </span>
                             </td>
 
@@ -1095,10 +1079,10 @@ export default function Dashboard() {
                             {/* Campaign Name */}
                             <td className="py-4 px-4 whitespace-nowrap">
                               <span className="text-xs font-semibold text-slate-800">
-                                {lead.campaign_name || 'Meta Lead Campaign'}
+                                {lead.campaign_name || '—'}
                               </span>
                               <span className="block text-[10px] text-slate-400">
-                                {lead.product_interest || 'Mustard Oil (15L Tin)'}
+                                {lead.product_interest || '—'}
                               </span>
                             </td>
 
@@ -1294,7 +1278,7 @@ export default function Dashboard() {
                         <span className="text-[10px] font-bold text-rose-600">{lead.lead_id} • Uncontacted &gt;15m</span>
                       </td>
                       <td className="py-4 px-4 font-semibold text-slate-800 tabular-nums">+91 {lead.mobile}</td>
-                      <td className="py-4 px-4 font-medium text-slate-700">{lead.city}</td>
+                      <td className="py-4 px-4 font-medium text-slate-700">{lead.city || '—'}</td>
                       <td className="py-4 px-4 font-medium text-slate-700">{lead.assignedTo}</td>
                       <td className="py-4 px-6 text-right whitespace-nowrap">
                         <button
@@ -1333,7 +1317,7 @@ export default function Dashboard() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Ramesh Chandra Sharma"
+                  placeholder="Enter prospect full name"
                   value={newLeadForm.name}
                   onChange={e => setNewLeadForm({ ...newLeadForm, name: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -1345,7 +1329,7 @@ export default function Dashboard() {
                   <input
                     type="tel"
                     required
-                    placeholder="9826012345"
+                    placeholder="10-digit mobile number"
                     value={newLeadForm.mobile}
                     onChange={e => setNewLeadForm({ ...newLeadForm, mobile: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -1355,7 +1339,7 @@ export default function Dashboard() {
                   <label className="font-semibold text-slate-700 block mb-1">City / Region</label>
                   <input
                     type="text"
-                    placeholder="Indore"
+                    placeholder="Enter city or district"
                     value={newLeadForm.city}
                     onChange={e => setNewLeadForm({ ...newLeadForm, city: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -1364,30 +1348,24 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Business Type</label>
-                  <select
+                  <label className="font-semibold text-slate-700 block mb-1">Business / Inquiry Type</label>
+                  <input
+                    type="text"
+                    placeholder="Optional business category"
                     value={newLeadForm.business_type}
                     onChange={e => setNewLeadForm({ ...newLeadForm, business_type: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    <option value="Distributor">Distributor</option>
-                    <option value="Trader">Wholesale Trader</option>
-                    <option value="Super Stockist">Super Stockist</option>
-                    <option value="Retailer">Retail Store</option>
-                  </select>
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Product Requirement</label>
-                  <select
+                  <label className="font-semibold text-slate-700 block mb-1">Requirement / Interest</label>
+                  <input
+                    type="text"
+                    placeholder="Optional requirement details"
                     value={newLeadForm.product_interest}
                     onChange={e => setNewLeadForm({ ...newLeadForm, product_interest: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    <option value="Mustard Oil (15L Tin)">Mustard Oil (15L Tin)</option>
-                    <option value="Soybean Refined Oil">Soybean Refined Oil</option>
-                    <option value="Sunflower Oil">Sunflower Oil</option>
-                    <option value="Groundnut Oil">Groundnut Oil</option>
-                  </select>
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
                 </div>
               </div>
               <button

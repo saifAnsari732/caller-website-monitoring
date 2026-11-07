@@ -4,28 +4,22 @@ import Header from '../../components/Header';
 import {
   Zap,
   TrendingUp,
-  DollarSign,
   Rocket,
   CheckCircle2,
   RefreshCw,
   Loader2,
-  ArrowUpRight,
-  Sparkles,
-  Sliders,
   Play,
   Pause,
-  AlertCircle,
-  X,
-  Target
+  X
 } from 'lucide-react';
 
 export default function BoostPage() {
   const [campaigns, setCampaigns] = useState([]);
-  const [metaData, setMetaData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [boostingId, setBoostingId] = useState(null);
   const [banner, setBanner] = useState(null);
   const [selectedMultiplier, setSelectedMultiplier] = useState(1.5);
+  const [customBudgets, setCustomBudgets] = useState({});
 
   const showToast = (msg) => {
     setBanner(msg);
@@ -38,7 +32,6 @@ export default function BoostPage() {
       const data = await res.json();
       if (data.campaigns) {
         setCampaigns(data.campaigns);
-        setMetaData(data);
       }
     } catch (e) {
       console.error(e);
@@ -51,10 +44,10 @@ export default function BoostPage() {
     fetchCampaigns();
   }, [fetchCampaigns]);
 
-  // Execute 1-Click Budget Boost
   const handleBoostCampaign = async (campaign, multiplier = 1.5) => {
     setBoostingId(campaign.campaignId);
     try {
+      const customVal = Number(customBudgets[campaign.campaignId] || 0);
       const res = await fetch('/api/meta/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -62,15 +55,16 @@ export default function BoostPage() {
           action: 'BOOST_CAMPAIGN',
           campaignId: campaign.campaignId,
           boostMultiplier: multiplier,
+          ...(customVal > 0 ? { newBudget: customVal } : {}),
           activateIfPaused: true
         })
       });
       const data = await res.json();
       if (data.success) {
-        showToast(data.message || `🚀 Boosted "${campaign.name}"!`);
+        showToast(data.message || `Boosted "${campaign.name}"!`);
         fetchCampaigns();
       } else {
-        showToast(`Boost error: ${data.error || 'Failed to boost campaign'}`);
+        showToast(`Boost notice: ${data.error || 'Failed to boost campaign'}`);
       }
     } catch (err) {
       console.error(err);
@@ -80,7 +74,6 @@ export default function BoostPage() {
     }
   };
 
-  // Toggle Campaign Active / Paused
   const handleToggleStatus = async (campaign) => {
     const newStatus = campaign.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
     setBoostingId(campaign.campaignId);
@@ -106,7 +99,6 @@ export default function BoostPage() {
     }
   };
 
-  // Trigger high-priority lead acceleration from linked form
   const handleAccelerateLeads = async (campaign) => {
     setBoostingId(campaign.campaignId);
     try {
@@ -115,13 +107,13 @@ export default function BoostPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'SYNC_FORM_LEADS',
-          formId: campaign.linkedFormId || '1768141694308234',
-          count: 10
+          formId: campaign.linkedFormId || '',
+          count: 25
         })
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`⚡ Lead Acceleration: Ingested ${data.syncedCount} fresh leads directly from Meta!`);
+        showToast(`Lead Acceleration: Ingested ${data.syncedCount} fresh leads directly from Meta!`);
         fetchCampaigns();
       }
     } catch (err) {
@@ -138,7 +130,7 @@ export default function BoostPage() {
         subtitle="Scale ad budgets, reactivate high-performing campaigns & accelerate live lead acquisition in 1-Click for Kisan Choice"
       />
 
-      <main className="p-6 lg:p-8 space-y-6 flex-1 max-w-7xl mx-auto w-full">
+      <main className="px-5 lg:px-7 py-6 space-y-6 flex-1 w-full max-w-none">
         {banner && (
           <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2">
@@ -152,33 +144,35 @@ export default function BoostPage() {
         )}
 
         {/* Boost Hero Banner */}
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 rounded-3xl p-6 lg:p-8 text-white shadow-md relative overflow-hidden">
-          <div className="relative z-10 max-w-2xl space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-xs text-xs font-bold">
-              <Rocket size={14} className="text-amber-300" />
-              <span>Meta Ads Lead Acceleration Engine</span>
+        <div className="bg-slate-900 rounded-2xl p-6 lg:p-7 text-white border border-slate-800 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-3xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs font-semibold">
+              <Rocket size={14} className="text-blue-400" />
+              <span>Meta Ads Budget Scaling Engine</span>
             </div>
-            <h2 className="text-2xl lg:text-3xl font-heading font-black tracking-tight">
+            <h2 className="text-2xl font-heading font-extrabold tracking-tight text-white">
               Scale Your Highest Converting Campaigns
             </h2>
-            <p className="text-xs lg:text-sm text-blue-100 leading-relaxed">
-              Instantly scale daily budgets, boost impressions on top-performing regional forms and route incoming leads immediately into telecaller pools.
+            <p className="text-xs lg:text-sm text-slate-300 leading-relaxed">
+              Adjust daily budgets via Meta Graph API v21.0, reactivate paused campaigns, and sync incoming leads directly into telecaller queues.
             </p>
+          </div>
 
-            <div className="pt-2 flex items-center gap-3 flex-wrap">
-              <span className="text-xs text-white/80 font-semibold">Select Boost Multiplier:</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 shrink-0">
+            <span className="text-xs text-slate-400 font-semibold">Boost Multiplier:</span>
+            <div className="flex items-center gap-2 flex-wrap">
               {[
-                { label: '+25% Boost', val: 1.25 },
-                { label: '+50% Boost (Recommended)', val: 1.5 },
-                { label: '2x Double Budget', val: 2.0 }
-              ].map(b => (
+                { label: '+25%', val: 1.25 },
+                { label: '+50% (Recommended)', val: 1.5 },
+                { label: '2x Budget', val: 2.0 }
+              ].map((b) => (
                 <button
                   key={b.val}
                   onClick={() => setSelectedMultiplier(b.val)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     selectedMultiplier === b.val
-                      ? 'bg-white text-blue-700 shadow-md font-extrabold border border-white/60'
-                      : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
                   }`}
                 >
                   {b.label}
@@ -189,7 +183,7 @@ export default function BoostPage() {
         </div>
 
         {/* Active Campaigns Boost Deck */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
           {loading ? (
             <div className="col-span-full py-16 flex flex-col items-center justify-center text-slate-400 gap-2">
               <Loader2 size={28} className="animate-spin text-blue-600" />
@@ -202,8 +196,9 @@ export default function BoostPage() {
           ) : (
             campaigns.map((c) => {
               const isBoosting = boostingId === c.campaignId;
-              const currentBudget = c.dailyBudget || 250;
-              const boostedBudget = Math.round(currentBudget * selectedMultiplier);
+              const currentBudget = Number(c.dailyBudget) || 0;
+              const customVal = Number(customBudgets[c.campaignId] || 0);
+              const targetBudget = customVal > 0 ? customVal : (currentBudget > 0 ? Math.round(currentBudget * selectedMultiplier) : 0);
               const isActive = c.status === 'ACTIVE';
 
               return (
@@ -260,20 +255,30 @@ export default function BoostPage() {
                       <div>
                         <div className="text-[10px] font-bold text-slate-400 uppercase">Daily Budget</div>
                         <div className="text-xs font-heading font-extrabold text-slate-900 mt-0.5">
-                          ₹{currentBudget}
+                          {currentBudget > 0 ? `₹${currentBudget}` : 'AdSet'}
                         </div>
                       </div>
                     </div>
 
-                    {/* Boost Projection */}
-                    <div className="p-3 rounded-2xl bg-blue-50/60 border border-blue-100 text-xs text-blue-900 space-y-1">
+                    {/* Budget Input / Multiplier Target */}
+                    <div className="p-3 rounded-2xl bg-blue-50/60 border border-blue-100 text-xs text-blue-900 space-y-2">
                       <div className="flex items-center justify-between font-bold">
-                        <span>Boost Daily Budget:</span>
-                        <span className="text-blue-700 font-extrabold">₹{boostedBudget}/day</span>
+                        <span>Target Daily Budget (₹):</span>
+                        <span className="text-blue-700 font-extrabold">
+                          {targetBudget > 0 ? `₹${targetBudget}/day` : 'AdSet Scale'}
+                        </span>
                       </div>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder={currentBudget > 0 ? `Custom ₹ (or ${selectedMultiplier}x = ₹${Math.round(currentBudget * selectedMultiplier)})` : 'Set custom daily budget (INR)'}
+                        value={customBudgets[c.campaignId] || ''}
+                        onChange={(e) => setCustomBudgets(prev => ({ ...prev, [c.campaignId]: e.target.value }))}
+                        className="w-full px-3 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
                       <div className="text-[11px] text-blue-700 flex items-center gap-1">
                         <TrendingUp size={12} />
-                        <span>Est. +{Math.round(selectedMultiplier * 14)} additional leads/week</span>
+                        <span>Pushes live budget update to Meta Graph API v21.0</span>
                       </div>
                     </div>
                   </div>
@@ -290,7 +295,7 @@ export default function BoostPage() {
                       ) : (
                         <Zap size={14} className="fill-white" />
                       )}
-                      <span>1-Click Boost to ₹{boostedBudget}</span>
+                      <span>{targetBudget > 0 ? `1-Click Scale to ₹${targetBudget}/day` : `1-Click Scale (${selectedMultiplier}x)`}</span>
                     </button>
 
                     <button
@@ -298,7 +303,7 @@ export default function BoostPage() {
                       disabled={isBoosting}
                       className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
                     >
-                      <Sparkles size={12} className="text-amber-500" />
+                      <RefreshCw size={12} className="text-slate-600" />
                       <span>Accelerate Real Lead Sync</span>
                     </button>
                   </div>

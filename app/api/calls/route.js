@@ -3,7 +3,8 @@ import connectDB from '../../../lib/db';
 import Call from '../../../lib/models/Call';
 import User from '../../../lib/models/User';
 import Lead from '../../../lib/models/Lead';
-import { ensureInitialCRMData } from '../../../lib/settings';
+import { purgeDashboardCache } from '../../../lib/cache';
+import { requireAdminApi } from '../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,10 @@ function formatDuration(sec) {
 
 export async function GET(request) {
   try {
+    if (!(await requireAdminApi(request))) {
+      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    }
     await connectDB();
-    await ensureInitialCRMData();
     const { searchParams } = new URL(request.url);
     const callerId = searchParams.get('callerId') || '';
     const search = searchParams.get('search') || '';
@@ -93,7 +96,7 @@ export async function GET(request) {
 
     const summaryData = Array.from(summaryMap.values()).map(s => ({
       ...s,
-      date: dateFilter || 'Live All-Time',
+      date: dateFilter || 'All Recorded',
       duration: formatDuration(s.totalSeconds)
     }));
 
@@ -108,15 +111,15 @@ export async function GET(request) {
         hour12: true
       }),
       agent: c.caller?.name || 'Telecaller',
-      agentTeam: c.caller?.team || 'Sales',
-      leadName: c.lead?.name || 'Unknown Prospect',
+      agentTeam: c.caller?.team || '',
+      leadName: c.lead?.name || '—',
       leadMobile: c.lead?.mobile || '',
       leadId: c.lead?.lead_id || '',
       durationSec: c.duration || 0,
       duration: formatDuration(c.duration || 0),
       outcome: c.status || 'Connected',
       recordingUrl: c.recording_url || null,
-      notes: c.notes || 'No call notes recorded.'
+      notes: c.notes || ''
     }));
 
     return NextResponse.json({
@@ -139,7 +142,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Lead and Telecaller are required' }, { status: 400 });
     }
 
-    const durSec = Number(duration) || 120;
+    const durSec = Math.max(0, Number(duration) || 0);
     const now = new Date();
     const startTime = new Date(now.getTime() - durSec * 1000);
 
@@ -150,7 +153,7 @@ export async function POST(request) {
       end_time: now,
       duration: durSec,
       status: status || 'Interested',
-      notes: notes || 'Call logged from Web Admin Dialer.'
+      notes: notes || ''
     });
 
     await Lead.findByIdAndUpdate(leadId, {
@@ -161,6 +164,7 @@ export async function POST(request) {
       $inc: { call_attempts: 1 }
     });
 
+    purgeDashboardCache();
     return NextResponse.json({ success: true, call }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

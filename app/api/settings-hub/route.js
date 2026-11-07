@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import connectDB from '../../../lib/db';
-import SystemSetting from '../../../lib/models/SystemSetting';
 import Lead from '../../../lib/models/Lead';
 import User from '../../../lib/models/User';
-import { getOrInitSettings, DEFAULT_META_FORMS } from '../../../lib/settings';
+import { getOrInitSettings } from '../../../lib/settings';
+import { purgeDashboardCache, purgeMetaCache } from '../../../lib/cache';
+import { requireAdminApi } from '../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   try {
+    if (!(await requireAdminApi(request))) {
+      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    }
     await connectDB();
     const settings = await getOrInitSettings();
     const [telecallers, leads] = await Promise.all([
@@ -16,19 +20,17 @@ export async function GET() {
       Lead.find({}).select('lead_source campaign_name status assigned_to business_type city state createdAt').lean()
     ]);
 
-    // Real campaign aggregation from Leads + customCampaigns + metaForms
     const campaignMap = new Map();
 
-    // Seed from customCampaigns and metaForms first
-    for (const cc of (settings.customCampaigns || [])) {
-      campaignMap.set(cc.name, {
-        name: cc.name,
-        platform: cc.platform || 'META ADS',
-        formName: cc.formName || 'Meta Lead Form',
-        team: cc.team || 'North Region Sales',
-        rule: cc.rule || 'Round-Robin',
-        status: cc.status || 'ACTIVE',
-        dailyBudget: cc.dailyBudget || 2500,
+    for (const mc of (settings.metaCampaigns || [])) {
+      campaignMap.set(mc.name, {
+        name: mc.name,
+        platform: 'META ADS',
+        formName: mc.linkedFormName || '',
+        team: mc.assignedTeam || 'North Region Sales',
+        rule: mc.distributionRule === 'LOAD_BALANCED' ? 'Load-Balanced' : 'Round-Robin',
+        status: mc.status || 'ACTIVE',
+        dailyBudget: mc.dailyBudget || 0,
         total: 0,
         converted: 0,
         interested: 0,
@@ -36,17 +38,16 @@ export async function GET() {
       });
     }
 
-    for (const mf of (settings.metaForms || [])) {
-      const cName = mf.campaignName || mf.formName;
-      if (!campaignMap.has(cName)) {
-        campaignMap.set(cName, {
-          name: cName,
-          platform: 'META ADS',
-          formName: mf.formName,
-          team: mf.assignedTeam || 'North Region Sales',
-          rule: mf.distributionRule === 'LOAD_BALANCED' ? 'Load-Balanced' : 'Round-Robin',
-          status: mf.active ? 'ACTIVE' : 'PAUSED',
-          dailyBudget: 3000,
+    for (const cc of (settings.customCampaigns || [])) {
+      if (!campaignMap.has(cc.name)) {
+        campaignMap.set(cc.name, {
+          name: cc.name,
+          platform: cc.platform || 'META ADS',
+          formName: cc.formName || '',
+          team: cc.team || 'North Region Sales',
+          rule: cc.rule || 'Round-Robin',
+          status: cc.status || 'ACTIVE',
+          dailyBudget: cc.dailyBudget || 0,
           total: 0,
           converted: 0,
           interested: 0,
@@ -56,20 +57,16 @@ export async function GET() {
     }
 
     for (const l of leads) {
-      const key = l.campaign_name && l.campaign_name !== 'Meta Lead Campaign'
-        ? l.campaign_name
-        : (l.lead_source || 'Facebook Meta Lead Ads');
-
+      const key = l.campaign_name || l.lead_source || 'Facebook Meta Lead Ads';
       if (!campaignMap.has(key)) {
-        const isMeta = key.toLowerCase().includes('meta') || key.toLowerCase().includes('facebook') || (l.lead_source || '').toLowerCase().includes('meta');
         campaignMap.set(key, {
           name: key,
-          platform: isMeta ? 'META ADS' : 'DIRECT / CRM',
-          formName: isMeta ? 'KisanChoice Lead Form 2026' : 'CRM Direct Ingestion',
-          team: isMeta ? 'North Region Sales' : 'Field Ops & Followup',
+          platform: 'META ADS',
+          formName: '',
+          team: 'North Region Sales',
           rule: settings.distributionStrategy === 'LOAD_BALANCED' ? 'Load-Balanced' : 'Round-Robin',
           status: 'ACTIVE',
-          dailyBudget: isMeta ? 3000 : 0,
+          dailyBudget: 0,
           total: 0,
           converted: 0,
           interested: 0,
@@ -117,10 +114,12 @@ export async function PUT(request) {
     if (Array.isArray(body.customCampaigns)) settings.customCampaigns = body.customCampaigns;
     if (Array.isArray(body.metaForms)) settings.metaForms = body.metaForms;
     if (body.metaConfig) {
-      settings.metaConfig = { ...settings.metaConfig.toObject?.() || settings.metaConfig, ...body.metaConfig };
+      settings.metaConfig = { ...(settings.metaConfig.toObject?.() || settings.metaConfig), ...body.metaConfig };
     }
 
     await settings.save();
+    purgeDashboardCache();
+    purgeMetaCache();
     return NextResponse.json({ success: true, settings });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

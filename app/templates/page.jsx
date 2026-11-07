@@ -26,7 +26,7 @@ export default function TemplatesPage() {
     type: 'WHATSAPP',
     name: '',
     category: 'Welcome',
-    content: 'Namaste {{lead_name}} ji! Thank you for inquiring with Kisan India Pvt Ltd regarding {{product_interest}}. Main {{agent_name}} bol raha hoon.'
+    content: 'Namaste {{lead_name}}, thank you for connecting with Kisan Choice. Main {{agent_name}} sampark kar raha hoon.'
   });
 
   const showToast = (msg) => {
@@ -84,7 +84,7 @@ export default function TemplatesPage() {
       type: activeTab,
       name: '',
       category: 'Welcome',
-      content: 'Namaste {{lead_name}} ji! Thank you for inquiring with Kisan India Pvt Ltd regarding {{product_interest}}.'
+      content: 'Namaste {{lead_name}}, thank you for connecting with Kisan Choice.'
     });
   };
 
@@ -167,6 +167,10 @@ export default function TemplatesPage() {
             <Loader2 size={24} className="animate-spin mx-auto mb-2 text-blue-600" />
             Loading templates...
           </div>
+        ) : filteredTemplates.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center text-slate-500 text-xs font-medium">
+            No {activeTab.toLowerCase()} templates saved yet. Click &ldquo;Create Template&rdquo; above to add one.
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredTemplates.map((tpl) => (
@@ -213,17 +217,12 @@ export default function TemplatesPage() {
                     </button>
                     {tpl.type === 'WHATSAPP' && (
                       <a
-                        href={`https://wa.me/?text=${encodeURIComponent(
-                          tpl.content
-                            .replace('{{lead_name}}', 'Rajesh Ji')
-                            .replace('{{product_interest}}', 'Mustard Oil 15L Tin')
-                            .replace('{{agent_name}}', 'Kisan India Sales')
-                        )}`}
+                        href={`https://wa.me/?text=${encodeURIComponent(tpl.content)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
                       >
-                        <Send size={13} /> Test on WhatsApp
+                        <Send size={13} /> Open in WhatsApp
                       </a>
                     )}
                   </div>

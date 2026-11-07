@@ -3,40 +3,31 @@ import { useState, useEffect, useCallback } from 'react';
 import Header from '../../components/Header';
 import {
   Target,
-  TrendingUp,
-  Award,
   Clock,
-  Sparkles,
   DollarSign,
   CheckCircle2,
-  AlertTriangle,
   Loader2,
   RefreshCw,
   Edit3,
   Save,
   X,
-  ChevronRight,
-  Zap,
-  BarChart3,
   Users
 } from 'lucide-react';
 
 export default function GoalsPage() {
   const [campaigns, setCampaigns] = useState([]);
-  const [metaData, setMetaData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [banner, setBanner] = useState(null);
 
-  // Edit Goal Modal State
   const [editingGoal, setEditingGoal] = useState(null);
   const [savingGoal, setSavingGoal] = useState(false);
   const [goalForm, setGoalForm] = useState({
-    targetLeadsDaily: 25,
-    targetCostPerLead: 30,
-    targetMonthlyBudget: 15000,
+    targetLeadsDaily: 0,
+    targetCostPerLead: 0,
+    targetMonthlyBudget: 0,
     slaTargetMinutes: 15,
-    conversionRateTarget: 12,
+    conversionRateTarget: 0,
     notes: ''
   });
 
@@ -51,7 +42,6 @@ export default function GoalsPage() {
       const data = await res.json();
       if (data.campaigns) {
         setCampaigns(data.campaigns);
-        setMetaData(data);
       }
     } catch (e) {
       console.error(e);
@@ -68,12 +58,12 @@ export default function GoalsPage() {
   const handleOpenEditGoal = (campaign) => {
     setEditingGoal(campaign);
     setGoalForm({
-      targetLeadsDaily: campaign.goal?.targetLeadsDaily || campaign.targetLeadsDaily || 25,
-      targetCostPerLead: campaign.goal?.targetCostPerLead || campaign.targetCostPerLead || (campaign.leadsCount > 0 ? Math.round(campaign.spend / campaign.leadsCount) : 30),
-      targetMonthlyBudget: campaign.goal?.targetMonthlyBudget || campaign.targetMonthlyBudget || ((campaign.dailyBudget || 300) * 30),
-      slaTargetMinutes: campaign.goal?.slaTargetMinutes || 15,
-      conversionRateTarget: campaign.goal?.conversionRateTarget || 12,
-      notes: campaign.goal?.notes || `Performance target for ${campaign.name}`
+      targetLeadsDaily: Number(campaign.goal?.targetLeadsDaily || campaign.targetLeadsDaily || 0),
+      targetCostPerLead: Number(campaign.goal?.targetCostPerLead || campaign.targetCostPerLead || 0),
+      targetMonthlyBudget: Number(campaign.goal?.targetMonthlyBudget || campaign.targetMonthlyBudget || 0),
+      slaTargetMinutes: Number(campaign.goal?.slaTargetMinutes || 15),
+      conversionRateTarget: Number(campaign.goal?.conversionRateTarget || 0),
+      notes: campaign.goal?.notes || ''
     });
   };
 
@@ -108,7 +98,7 @@ export default function GoalsPage() {
 
   const totalLeads = campaigns.reduce((acc, c) => acc + (c.leadsCount || 0), 0);
   const totalSpend = campaigns.reduce((acc, c) => acc + (c.spend || 0), 0);
-  const avgCPL = totalLeads > 0 ? (totalSpend / totalLeads).toFixed(2) : '0.00';
+  const avgCPL = totalLeads > 0 && totalSpend > 0 ? (totalSpend / totalLeads).toFixed(2) : null;
   const activeCount = campaigns.filter(c => c.status === 'ACTIVE').length;
 
   return (
@@ -118,7 +108,7 @@ export default function GoalsPage() {
         subtitle="Set, monitor and track lead acquisition quotas, target CPL and telecaller conversion milestones for Kisan Choice"
       />
 
-      <main className="p-6 lg:p-8 space-y-6 flex-1 max-w-7xl mx-auto w-full">
+      <main className="px-5 lg:px-7 py-6 space-y-6 flex-1 w-full max-w-none">
         {banner && (
           <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2">
@@ -161,20 +151,20 @@ export default function GoalsPage() {
               <DollarSign size={16} className="text-indigo-600" />
             </div>
             <div className="text-2xl font-heading font-extrabold text-indigo-700 tabular-nums">
-              ₹{avgCPL}
+              {avgCPL !== null ? `₹${avgCPL}` : '—'}
             </div>
-            <div className="text-[11px] text-indigo-600 mt-1 font-medium">Target Benchmark: &lt; ₹35 / Lead</div>
+            <div className="text-[11px] text-indigo-600 mt-1 font-medium">Computed from live Meta spend & leads</div>
           </div>
 
           <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider">SLA Response Benchmark</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">SLA Response Target</span>
               <Clock size={16} className="text-amber-600" />
             </div>
             <div className="text-2xl font-heading font-extrabold text-slate-900 tabular-nums">
               &lt; 15 Mins
             </div>
-            <div className="text-[11px] text-amber-700 mt-1 font-medium">Speed to First Call Target</div>
+            <div className="text-[11px] text-amber-700 mt-1 font-medium">Speed to First Call SLA</div>
           </div>
         </div>
 
@@ -186,7 +176,7 @@ export default function GoalsPage() {
                 <Target size={16} className="text-blue-600" /> Campaign Performance Goals & Quotas
               </h3>
               <p className="text-xs text-slate-500">
-                Track daily lead acquisition pace, target cost-per-lead and SLA adherence for each active campaign
+                Track daily lead acquisition pace, live cost-per-lead and SLA adherence for each active campaign
               </p>
             </div>
             <button
@@ -208,9 +198,9 @@ export default function GoalsPage() {
                   <th className="py-3.5 px-5">Campaign Name</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4 text-center">Daily Lead Target</th>
-                  <th className="py-3.5 px-4 text-right">Spend</th>
+                  <th className="py-3.5 px-4 text-right">Live Spend</th>
                   <th className="py-3.5 px-4 text-center">Current Leads</th>
-                  <th className="py-3.5 px-4 text-center">Est. CPL</th>
+                  <th className="py-3.5 px-4 text-center">Actual CPL</th>
                   <th className="py-3.5 px-4">Routing Team</th>
                   <th className="py-3.5 px-5 text-right">Configure Goal</th>
                 </tr>
@@ -231,11 +221,11 @@ export default function GoalsPage() {
                   </tr>
                 ) : (
                   campaigns.map((c) => {
-                    const targetDaily = c.goal?.targetLeadsDaily || c.targetLeadsDaily || 25;
-                    const targetCPL = c.goal?.targetCostPerLead || c.targetCostPerLead || 30;
-                    const cpl = c.leadsCount > 0 ? (c.spend / c.leadsCount).toFixed(1) : (c.spend > 0 ? c.spend.toFixed(1) : Number(targetCPL).toFixed(1));
-                    const isHealthy = Number(cpl) <= Number(targetCPL);
-                    const pacingPct = Math.min(100, Math.round(((c.leadsCount || 0) / Math.max(1, targetDaily)) * 100));
+                    const targetDaily = Number(c.goal?.targetLeadsDaily || c.targetLeadsDaily || 0);
+                    const targetCPL = Number(c.goal?.targetCostPerLead || c.targetCostPerLead || 0);
+                    const actualCPL = c.leadsCount > 0 && c.spend > 0 ? c.spend / c.leadsCount : null;
+                    const isHealthy = actualCPL === null || targetCPL === 0 || actualCPL <= targetCPL;
+                    const pacingPct = targetDaily > 0 ? Math.min(100, Math.round(((c.leadsCount || 0) / targetDaily) * 100)) : 0;
 
                     return (
                       <tr key={c.campaignId} className="hover:bg-slate-50/60 transition-colors">
@@ -257,15 +247,21 @@ export default function GoalsPage() {
                         </td>
 
                         <td className="py-4 px-4 text-center">
-                          <div className="font-heading font-extrabold text-blue-700 tabular-nums text-sm">
-                            {targetDaily} / day
-                          </div>
-                          <div className="w-20 mx-auto mt-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className="bg-blue-600 h-full rounded-full transition-all duration-300"
-                              style={{ width: `${pacingPct}%` }}
-                            ></div>
-                          </div>
+                          {targetDaily > 0 ? (
+                            <>
+                              <div className="font-heading font-extrabold text-blue-700 tabular-nums text-sm">
+                                {targetDaily} / day
+                              </div>
+                              <div className="w-20 mx-auto mt-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                                  style={{ width: `${pacingPct}%` }}
+                                ></div>
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-slate-400 font-semibold">Not Set</span>
+                          )}
                         </td>
 
                         <td className="py-4 px-4 text-right font-medium text-slate-700 tabular-nums">
@@ -277,13 +273,17 @@ export default function GoalsPage() {
                         </td>
 
                         <td className="py-4 px-4 text-center">
-                          <span
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold tabular-nums ${
-                              isHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                            }`}
-                          >
-                            ₹{cpl}
-                          </span>
+                          {actualCPL !== null ? (
+                            <span
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold tabular-nums ${
+                                isHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                              }`}
+                            >
+                              ₹{actualCPL.toFixed(1)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-semibold">—</span>
+                          )}
                         </td>
 
                         <td className="py-4 px-4 font-semibold text-slate-700">
@@ -333,6 +333,7 @@ export default function GoalsPage() {
                     <label className="block font-semibold text-slate-700 mb-1">Daily Lead Target</label>
                     <input
                       type="number"
+                      min="0"
                       value={goalForm.targetLeadsDaily}
                       onChange={(e) => setGoalForm({ ...goalForm, targetLeadsDaily: Number(e.target.value) })}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
@@ -342,6 +343,7 @@ export default function GoalsPage() {
                     <label className="block font-semibold text-slate-700 mb-1">Target CPL (₹)</label>
                     <input
                       type="number"
+                      min="0"
                       value={goalForm.targetCostPerLead}
                       onChange={(e) => setGoalForm({ ...goalForm, targetCostPerLead: Number(e.target.value) })}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
@@ -354,6 +356,7 @@ export default function GoalsPage() {
                     <label className="block font-semibold text-slate-700 mb-1">Monthly Budget Goal (₹)</label>
                     <input
                       type="number"
+                      min="0"
                       value={goalForm.targetMonthlyBudget}
                       onChange={(e) => setGoalForm({ ...goalForm, targetMonthlyBudget: Number(e.target.value) })}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
@@ -363,6 +366,7 @@ export default function GoalsPage() {
                     <label className="block font-semibold text-slate-700 mb-1">Target Conversion Rate (%)</label>
                     <input
                       type="number"
+                      min="0"
                       value={goalForm.conversionRateTarget}
                       onChange={(e) => setGoalForm({ ...goalForm, conversionRateTarget: Number(e.target.value) })}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
@@ -377,7 +381,7 @@ export default function GoalsPage() {
                     value={goalForm.notes}
                     onChange={(e) => setGoalForm({ ...goalForm, notes: e.target.value })}
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
-                    placeholder="Focus on high-intent distributor inquiries in eastern UP..."
+                    placeholder="Enter campaign performance notes..."
                   />
                 </div>
 

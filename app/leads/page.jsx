@@ -10,7 +10,6 @@ import {
   Eye,
   ShieldAlert,
   X,
-  Upload,
   CheckSquare,
   MessageCircle,
   Calendar,
@@ -44,12 +43,10 @@ export default function LeadsPage() {
   const [urlHydrated, setUrlHydrated] = useState(false);
   const [updating, setUpdating] = useState(null);
 
-  // Bulk Selection State
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkCallerId, setBulkCallerId] = useState('ROUND_ROBIN');
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
-  // Modals & Inspector Drawer
   const [showAddModal, setShowAddModal] = useState(false);
   const [inspectorLeadId, setInspectorLeadId] = useState(null);
   const [inspectorData, setInspectorData] = useState(null);
@@ -59,9 +56,9 @@ export default function LeadsPage() {
     name: '',
     mobile: '',
     city: '',
-    state: 'Madhya Pradesh',
-    business_type: 'Distributor',
-    product_interest: 'Mustard Oil (15L Tin)',
+    state: '',
+    business_type: '',
+    product_interest: '',
     assigned_to: '',
     notes: ''
   });
@@ -173,7 +170,7 @@ export default function LeadsPage() {
       const data = await res.json();
       if (data.success) {
         setSelectedIds([]);
-        setBulkCallerId('');
+        setBulkCallerId('ROUND_ROBIN');
         fetchLeads();
       }
     } catch (e) {
@@ -199,9 +196,9 @@ export default function LeadsPage() {
           name: '',
           mobile: '',
           city: '',
-          state: 'Madhya Pradesh',
-          business_type: 'Distributor',
-          product_interest: 'Mustard Oil (15L Tin)',
+          state: '',
+          business_type: '',
+          product_interest: '',
           assigned_to: '',
           notes: ''
         });
@@ -220,7 +217,7 @@ export default function LeadsPage() {
     const csvContent = 'data:text/csv;charset=utf-8,' + [header, ...rows].join('\n');
     const link = document.createElement('a');
     link.setAttribute('href', encodeURI(csvContent));
-    link.setAttribute('download', `KisanConnect_Leads_${Date.now()}.csv`);
+    link.setAttribute('download', `KisanIndia_Leads_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -246,7 +243,7 @@ export default function LeadsPage() {
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search name, phone, city, L-1001..."
+                placeholder="Search name, phone, city, L-8302..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-800"
@@ -283,7 +280,6 @@ export default function LeadsPage() {
             >
               <option value="">All Sources</option>
               <option value="Facebook Meta Lead Ads">Facebook & Instagram Lead Ads</option>
-              <option value="Direct Phone / Manual CRM Entry">Direct Manual Entry</option>
             </select>
 
             {(search || statusFilter || callerFilter || campaignFilter || sourceFilter) && (
@@ -321,7 +317,7 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        {/* Bulk Assignment Bar (Visible when checkboxes are selected) */}
+        {/* Bulk Assignment Bar */}
         {selectedIds.length > 0 && (
           <div className="bg-slate-900 text-white px-6 py-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-lg">
             <div className="flex items-center gap-2 text-xs font-bold">
@@ -334,7 +330,7 @@ export default function LeadsPage() {
                 onChange={(e) => setBulkCallerId(e.target.value)}
                 className="px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-white"
               >
-                <option value="ROUND_ROBIN">⚡ Auto Round-Robin Pool (Distribute Evenly)</option>
+                <option value="ROUND_ROBIN">Auto Round-Robin Pool (Distribute Evenly)</option>
                 {users.map(u => (
                   <option key={u._id} value={u._id}>{u.name} ({u.team || 'Sales'})</option>
                 ))}
@@ -373,7 +369,7 @@ export default function LeadsPage() {
                   </th>
                   <th className="py-3.5 px-4">Lead ID</th>
                   <th className="py-3.5 px-4">Prospect & Phone</th>
-                  <th className="py-3.5 px-4">Location & Product</th>
+                  <th className="py-3.5 px-4">Location & Details</th>
                   <th className="py-3.5 px-4">Pipeline Status</th>
                   <th className="py-3.5 px-4">Assigned Telecaller</th>
                   <th className="py-3.5 px-5 text-right">Inspect</th>
@@ -397,6 +393,8 @@ export default function LeadsPage() {
                 ) : (
                   leads.map((lead) => {
                     const isChecked = selectedIds.includes(lead._id);
+                    const locationLabel = [lead.city, lead.state].filter(Boolean).join(', ');
+                    const detailLabel = [lead.product_interest, lead.business_type].filter(Boolean).join(' • ');
                     return (
                       <tr key={lead._id} className={`hover:bg-slate-50/70 transition-colors ${isChecked ? 'bg-rose-50/30' : ''}`}>
                         <td className="py-4 pl-5 pr-2">
@@ -427,13 +425,15 @@ export default function LeadsPage() {
                           </div>
                         </td>
                         <td className="py-4 px-4">
-                          <p className="font-bold text-slate-800">{lead.product_interest || 'General Oil Inquiry'}</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {lead.city || 'India'}{lead.state ? `, ${lead.state}` : ''} • {lead.business_type || 'Trader'}
-                          </p>
+                          {detailLabel ? (
+                            <p className="font-bold text-slate-800">{detailLabel}</p>
+                          ) : null}
+                          {locationLabel ? (
+                            <p className="text-[11px] text-slate-500 mt-0.5">{locationLabel}</p>
+                          ) : null}
                           <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                              {lead.lead_source || 'Meta Ads'}
+                              {lead.lead_source || 'Facebook Meta Lead Ads'}
                             </span>
                             {lead.campaign_name && (
                               <span className="text-[10px] text-slate-500 font-medium">
@@ -518,7 +518,6 @@ export default function LeadsPage() {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Quick Actions */}
                 <div className="flex items-center gap-3">
                   <a
                     href={`tel:${inspectorData.lead.mobile}`}
@@ -527,7 +526,7 @@ export default function LeadsPage() {
                     <Phone size={14} /> Dial +91 {inspectorData.lead.mobile}
                   </a>
                   <a
-                    href={`https://wa.me/91${String(inspectorData.lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${inspectorData.lead.name} ji, KisanConnect team se sampark kar rahe hain.`)}`}
+                    href={`https://wa.me/91${String(inspectorData.lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${inspectorData.lead.name} ji, Kisan Choice team se sampark kar rahe hain.`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"
@@ -536,15 +535,18 @@ export default function LeadsPage() {
                   </a>
                 </div>
 
-                {/* Metadata Grid */}
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <p className="text-slate-400 font-semibold">Location</p>
-                    <p className="font-bold text-slate-900 mt-0.5">{inspectorData.lead.city || 'N/A'}, {inspectorData.lead.state || 'India'}</p>
+                    <p className="font-bold text-slate-900 mt-0.5">
+                      {[inspectorData.lead.city, inspectorData.lead.state].filter(Boolean).join(', ') || '—'}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-slate-400 font-semibold">Business & Product</p>
-                    <p className="font-bold text-slate-900 mt-0.5">{inspectorData.lead.business_type || 'Trader'} • {inspectorData.lead.product_interest || 'Oil'}</p>
+                    <p className="text-slate-400 font-semibold">Business & Interest</p>
+                    <p className="font-bold text-slate-900 mt-0.5">
+                      {[inspectorData.lead.business_type, inspectorData.lead.product_interest].filter(Boolean).join(' • ') || '—'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-slate-400 font-semibold">Assigned Telecaller</p>
@@ -556,7 +558,6 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                {/* Call History */}
                 <div>
                   <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-3">
                     Logged Calls ({inspectorData.calls?.length || 0})
@@ -585,7 +586,6 @@ export default function LeadsPage() {
                   )}
                 </div>
 
-                {/* Followups History */}
                 <div>
                   <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-3">
                     Scheduled Follow-ups ({inspectorData.followups?.length || 0})
@@ -638,7 +638,7 @@ export default function LeadsPage() {
                   value={newLead.name}
                   onChange={e => setNewLead({ ...newLead, name: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800"
-                  placeholder="e.g.Ganesh Oil Mill & Traders"
+                  placeholder="Enter prospect full name"
                 />
               </div>
               <div>
@@ -649,7 +649,7 @@ export default function LeadsPage() {
                   value={newLead.mobile}
                   onChange={e => setNewLead({ ...newLead, mobile: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800"
-                  placeholder="9876543210"
+                  placeholder="10-digit mobile number"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -660,30 +660,28 @@ export default function LeadsPage() {
                     value={newLead.city}
                     onChange={e => setNewLead({ ...newLead, city: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800"
-                    placeholder="Indore"
+                    placeholder="City / District"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Business Type</label>
-                  <select
+                  <label className="font-bold text-slate-700 block mb-1">Inquiry Category</label>
+                  <input
+                    type="text"
                     value={newLead.business_type}
                     onChange={e => setNewLead({ ...newLead, business_type: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800"
-                  >
-                    <option value="Distributor">Distributor</option>
-                    <option value="Trader">Trader</option>
-                    <option value="Retail">Retailer</option>
-                    <option value="Industrial User">Industrial User</option>
-                  </select>
+                    placeholder="Optional category"
+                  />
                 </div>
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Product Interest</label>
+                <label className="font-bold text-slate-700 block mb-1">Requirement / Notes</label>
                 <input
                   type="text"
                   value={newLead.product_interest}
                   onChange={e => setNewLead({ ...newLead, product_interest: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800"
+                  placeholder="Optional requirement details"
                 />
               </div>
               <div>

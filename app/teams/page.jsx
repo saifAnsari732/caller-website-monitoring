@@ -46,7 +46,7 @@ export default function TeamsPage() {
           name: newTeam.name.trim(),
           code: newTeam.code.trim() || `TM-0${teams.length + 1}`,
           leadName: newTeam.leadName.trim() || 'Team Lead',
-          leadMobile: newTeam.leadMobile.trim() || '9876543210',
+          leadMobile: newTeam.leadMobile.trim() || '',
           campaigns: newTeam.campaigns.split(',').map(s => s.trim()).filter(Boolean)
         }
       ];
@@ -204,7 +204,7 @@ export default function TeamsPage() {
                   required
                   value={newTeam.name}
                   onChange={e => setNewTeam({ ...newTeam, name: e.target.value })}
-                  placeholder="e.g. West India Agro Division"
+                  placeholder="Enter sales team name"
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
                 />
               </div>
@@ -215,7 +215,7 @@ export default function TeamsPage() {
                     type="text"
                     value={newTeam.code}
                     onChange={e => setNewTeam({ ...newTeam, code: e.target.value })}
-                    placeholder="WIA-04"
+                    placeholder="Optional team code"
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
                   />
                 </div>
@@ -225,7 +225,7 @@ export default function TeamsPage() {
                     type="text"
                     value={newTeam.leadName}
                     onChange={e => setNewTeam({ ...newTeam, leadName: e.target.value })}
-                    placeholder="Sanjay Verma"
+                    placeholder="Optional team lead"
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
                   />
                 </div>

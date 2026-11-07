@@ -376,9 +376,9 @@ export default function MetaLeadsPage() {
                         </td>
 
                         <td className="py-4 px-4">
-                          <p className="font-semibold text-slate-800">{lead.productInterest}</p>
+                          <p className="font-semibold text-slate-800">{lead.productInterest || lead.businessType || '—'}</p>
                           <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                            <MapPin size={11} /> {lead.city || 'Indore'}{lead.state ? `, ${lead.state}` : ''}
+                            <MapPin size={11} /> {[lead.city, lead.state].filter(Boolean).join(', ') || '—'}
                           </p>
                         </td>
 

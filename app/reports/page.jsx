@@ -96,7 +96,7 @@ export default function ReportsPage() {
   const summaryMetrics = [
     { metric: 'Total CRM Leads Ingested', current: kpis.totalLeads || leads.length, benchmark: 'Live MongoDB', note: `${kpis.freshLeads || 0} Fresh in Queue` },
     { metric: 'Total Calls Logged', current: kpis.todaysCalls || 0, benchmark: `${kpis.connectedCalls || 0} Connected`, note: 'Mobile + Web Dialer' },
-    { metric: 'Interested / Qualified Prospects', current: kpis.interestedLeads || 0, benchmark: 'Hot Pipeline', note: 'Distributor & Trader Inquiries' },
+    { metric: 'Interested / Qualified Prospects', current: kpis.interestedLeads || 0, benchmark: 'Hot Pipeline', note: 'Qualified Prospects' },
     { metric: 'Closed Revenue Deals', current: kpis.closedDeals || 0, benchmark: `${kpis.conversionRate || 0}% Win Rate`, note: 'Verified Orders' },
     { metric: 'Due & Overdue Follow-ups', current: kpis.pendingFollowups || 0, benchmark: `${kpis.overdueFollowups || 0} Overdue`, note: 'Callback Schedule' },
     { metric: 'SLA Breached (>15m Uncalled)', current: kpis.slaBreachCount || 0, benchmark: '15m SLA Target', note: 'Auto-Redistribution Ready' }

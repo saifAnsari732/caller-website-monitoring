@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectDB from '../../../../../lib/db';
 import SystemSetting from '../../../../../lib/models/SystemSetting';
+import { fetchLiveMetaFormsFromGraph } from '../../../../../lib/settings';
 import { purgeDashboardCache, purgeMetaCache } from '../../../../../lib/cache';
 
 export const dynamic = 'force-dynamic';
@@ -35,44 +36,96 @@ export async function GET(request) {
         </body>
       </html>
     `;
-    return new Response(errorHtml, {
-      headers: { 'Content-Type': 'text/html' }
-    });
+    return new Response(errorHtml, { headers: { 'Content-Type': 'text/html' } });
   }
 
   try {
     await connectDB();
-    const token = process.env.META_PAGE_ACCESS_TOKEN || '';
-    const pageId = process.env.META_PAGE_ID || '933429549844450';
-    const pageName = process.env.META_PAGE_NAME || 'Kisan Choice';
+    const appId = process.env.META_APP_ID || '1007200718473332';
+    const appSecret = process.env.META_APP_SECRET || '';
+    const redirectUri = `${origin}/api/meta/oauth/callback`;
 
-    // Update settings in database
     let settings = await SystemSetting.findOne({ key: 'global' });
     if (!settings) settings = new SystemSetting({ key: 'global' });
 
-    settings.metaConfig = {
-      connected: true,
-      appId: process.env.META_APP_ID || '1007200718473332',
-      pageId,
-      pageName,
-      accessToken: token,
-      verifyToken: process.env.META_VERIFY_TOKEN || 'OILFLOW_CRM_SECRET_2026',
-      webhookSubscribed: true,
-      autoSyncEnabled: true,
-      connectedAt: new Date(),
-      lastSyncAt: new Date()
-    };
-    settings.connectedIntegrations = []; // Ensure only Meta
-    await settings.save();
+    let activeToken = settings.metaConfig?.accessToken || process.env.META_PAGE_ACCESS_TOKEN || '';
+    let userToken = settings.metaConfig?.userAccessToken || process.env.META_USER_ACCESS_TOKEN || '';
+    let pageId = settings.metaConfig?.pageId || process.env.META_PAGE_ID || '933429549844450';
+    let pageName = settings.metaConfig?.pageName || process.env.META_PAGE_NAME || 'Kisan Choice';
+    let exchangedServerSide = false;
+    let syncedFormsCount = settings.metaForms?.length || 0;
 
-    purgeDashboardCache();
-    purgeMetaCache();
+    if (code && appSecret) {
+      try {
+        const tokenRes = await fetch(
+          `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`,
+          { cache: 'no-store' }
+        );
+        const tokenJson = await tokenRes.json();
+        if (tokenJson?.access_token) {
+          userToken = tokenJson.access_token;
+          try {
+            const llRes = await fetch(
+              `https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}&fb_exchange_token=${encodeURIComponent(userToken)}`,
+              { cache: 'no-store' }
+            );
+            const llJson = await llRes.json();
+            if (llJson?.access_token) userToken = llJson.access_token;
+          } catch {}
 
-    const successHtml = `
+          const pagesRes = await fetch(
+            `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token&access_token=${encodeURIComponent(userToken)}`,
+            { cache: 'no-store' }
+          );
+          const pagesJson = await pagesRes.json();
+          if (Array.isArray(pagesJson?.data) && pagesJson.data.length > 0) {
+            const chosen = pagesJson.data.find(p => p.id === pageId) || pagesJson.data[0];
+            pageId = chosen.id;
+            pageName = chosen.name;
+            activeToken = chosen.access_token || userToken;
+          } else {
+            activeToken = userToken;
+          }
+          exchangedServerSide = true;
+        }
+      } catch (exchangeErr) {
+        console.warn('OAuth code exchange warning:', exchangeErr.message);
+      }
+
+      if (exchangedServerSide && activeToken) {
+        const liveForms = await fetchLiveMetaFormsFromGraph(pageId, pageName, activeToken);
+        settings.metaConfig = {
+          connected: true,
+          appId,
+          pageId,
+          pageName,
+          adAccountId: process.env.META_AD_ACCOUNT_ID || 'act_1796071777698019',
+          accessToken: activeToken,
+          userAccessToken: userToken,
+          verifyToken: process.env.META_VERIFY_TOKEN || settings.metaConfig?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY',
+          webhookSubscribed: true,
+          autoSyncEnabled: true,
+          zeroLossFallback: true,
+          connectedAt: new Date(),
+          lastSyncAt: new Date()
+        };
+        if (liveForms.length > 0) {
+          settings.metaForms = liveForms;
+          settings.markModified('metaForms');
+          syncedFormsCount = liveForms.length;
+        }
+        settings.connectedIntegrations = [];
+        await settings.save();
+        purgeDashboardCache();
+        purgeMetaCache();
+      }
+    }
+
+    const callbackHtml = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Facebook Connected Successfully</title>
+          <title>Connecting Facebook Lead Ads...</title>
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f0fdf4; color: #0f172a; }
@@ -87,33 +140,73 @@ export async function GET(request) {
         <body>
           <div class="card">
             <div class="icon">f</div>
-            <h2>Connected with Facebook!</h2>
-            <div class="badge">Page: ${pageName} (${pageId})</div>
-            <p>Meta Lead Ads & Webhooks are successfully linked to your KisanConnect CRM.</p>
-            <div class="close-text">Closing window automatically in 2 seconds...</div>
+            <h2 id="title">${exchangedServerSide ? 'Connected with Facebook!' : 'Finalizing Meta Sync...'}</h2>
+            <div id="badge" class="badge">Page: ${pageName} (${pageId})</div>
+            <p id="desc">${exchangedServerSide ? `Meta Lead Ads & Webhooks (${syncedFormsCount} forms) are linked to your CRM.` : 'Exchanging Meta Graph v21.0 Page Access Token & syncing live forms...'}</p>
+            <div id="status" class="close-text">Please wait...</div>
           </div>
           <script>
-            try {
-              if (window.opener) {
-                window.opener.postMessage({
-                  type: 'META_OAUTH_SUCCESS',
-                  pageName: '${pageName}',
-                  pageId: '${pageId}',
-                  connected: true
-                }, '*');
+            (async function() {
+              const titleEl = document.getElementById('title');
+              const badgeEl = document.getElementById('badge');
+              const descEl = document.getElementById('desc');
+              const statusEl = document.getElementById('status');
+
+              function finishSuccess(pName, pId) {
+                try {
+                  if (window.opener) {
+                    window.opener.postMessage({
+                      type: 'META_OAUTH_SUCCESS',
+                      pageName: pName,
+                      pageId: pId,
+                      connected: true
+                    }, '*');
+                  }
+                } catch (e) {}
+                statusEl.textContent = 'Closing window automatically...';
+                setTimeout(() => { window.close(); }, 1400);
               }
-            } catch(e) {}
-            setTimeout(() => {
-              window.close();
-            }, 1800);
+
+              const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+              const hashToken = hashParams.get('access_token');
+
+              if (hashToken) {
+                try {
+                  const res = await fetch('/api/meta/oauth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accessToken: hashToken })
+                  });
+                  const data = await res.json();
+                  if (res.ok && data.success) {
+                    titleEl.textContent = 'Connected with Facebook!';
+                    badgeEl.textContent = 'Page: ' + data.pageName + ' (' + data.pageId + ')';
+                    descEl.textContent = data.message || ('Synced ' + data.formsSynced + ' forms and ' + data.realLeadsIngested + ' leads.');
+                    finishSuccess(data.pageName, data.pageId);
+                    return;
+                  } else {
+                    titleEl.textContent = 'Token Sync Warning';
+                    titleEl.style.color = '#e11d48';
+                    descEl.textContent = data.error || 'Could not save Facebook token.';
+                    statusEl.textContent = 'You may close this window.';
+                    return;
+                  }
+                } catch (err) {
+                  titleEl.textContent = 'Network Error';
+                  titleEl.style.color = '#e11d48';
+                  descEl.textContent = err.message;
+                  return;
+                }
+              }
+
+              finishSuccess('${pageName}', '${pageId}');
+            })();
           </script>
         </body>
       </html>
     `;
 
-    return new Response(successHtml, {
-      headers: { 'Content-Type': 'text/html' }
-    });
+    return new Response(callbackHtml, { headers: { 'Content-Type': 'text/html' } });
   } catch (err) {
     console.error('OAuth callback error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });

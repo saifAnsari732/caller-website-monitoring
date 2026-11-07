@@ -5,8 +5,8 @@ import User from '../../../lib/models/User';
 import Call from '../../../lib/models/Call';
 import Followup from '../../../lib/models/Followup';
 import SystemSetting from '../../../lib/models/SystemSetting';
-import { ensureInitialCRMData } from '../../../lib/settings';
 import { purgeDashboardCache } from '../../../lib/cache';
+import { requireAdminApi } from '../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +27,6 @@ async function pickCallerForDistribution(activeCallers, strategy) {
     return counts[0].caller;
   }
 
-  // Default Cyclic Round-Robin
   const lastLead = await Lead.findOne({ assigned_to: { $ne: null } }).sort({ assigned_at: -1 }).lean();
   if (!lastLead || !lastLead.assigned_to) return activeCallers[0];
   const idx = activeCallers.findIndex(c => c._id.toString() === lastLead.assigned_to.toString());
@@ -36,12 +35,13 @@ async function pickCallerForDistribution(activeCallers, strategy) {
 
 export async function GET(request) {
   try {
+    if (!(await requireAdminApi(request))) {
+      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    }
     await connectDB();
-    await ensureInitialCRMData();
     const { searchParams } = new URL(request.url);
     const detailId = searchParams.get('detailId') || '';
 
-    // If detailId is passed, return full Lead Inspector Drawer data (Lead + Calls + Followups)
     if (detailId) {
       const [lead, calls, followups] = await Promise.all([
         Lead.findById(detailId).populate('assigned_to', 'name mobile employee_id').lean(),
@@ -123,33 +123,34 @@ export async function POST(request) {
       activeCallers = await User.find({ role: 'telecaller', status: 'active' }).sort({ _id: 1 });
     }
 
-    // Bulk import support
     if (Array.isArray(body.leads)) {
       const createdLeads = [];
       for (const item of body.leads) {
-        if (!item.name && !item.mobile) continue;
+        const mobileVal = String(item.mobile || '').trim();
+        if (!item.name || !mobileVal) continue;
         const chosenCaller = await pickCallerForDistribution(activeCallers, strategy);
         const doc = await Lead.create({
-          name: item.name || 'Imported Prospect',
-          mobile: String(item.mobile || '0000000000').trim(),
-          email: item.email || '',
-          city: item.city || '',
-          state: item.state || '',
-          business_type: item.business_type || 'Trader',
-          product_interest: item.product_interest || 'Bulk Inquiry',
+          name: String(item.name).trim(),
+          mobile: mobileVal,
+          email: (item.email || '').trim(),
+          city: (item.city || '').trim(),
+          state: (item.state || '').trim(),
+          business_type: (item.business_type || '').trim(),
+          product_interest: (item.product_interest || '').trim(),
           lead_source: item.lead_source || 'CSV Bulk Import',
+          campaign_name: (item.campaign_name || '').trim(),
           status: chosenCaller ? 'Assigned' : 'Fresh Lead',
           assigned_to: chosenCaller ? chosenCaller._id : null,
           assigned_at: chosenCaller ? new Date() : null,
-          notes: item.notes || 'Imported via Web Admin CSV'
+          notes: item.notes || ''
         });
         createdLeads.push(doc);
       }
+      purgeDashboardCache();
       return NextResponse.json({ success: true, count: createdLeads.length }, { status: 201 });
     }
 
-    // Single manual lead creation
-    const { name, mobile, email, city, state, business_type, product_interest, lead_source, assigned_to, notes } = body;
+    const { name, mobile, email, city, state, business_type, product_interest, lead_source, campaign_name, assigned_to, notes } = body;
     if (!name || !mobile) {
       return NextResponse.json({ error: 'Name and mobile are required' }, { status: 400 });
     }
@@ -161,14 +162,15 @@ export async function POST(request) {
     }
 
     const newLead = await Lead.create({
-      name,
-      mobile,
-      email: email || '',
-      city: city || '',
-      state: state || '',
-      business_type: business_type || 'Distributor',
-      product_interest: product_interest || 'Mustard Oil (15L Tin)',
+      name: String(name).trim(),
+      mobile: String(mobile).trim(),
+      email: (email || '').trim(),
+      city: (city || '').trim(),
+      state: (state || '').trim(),
+      business_type: (business_type || '').trim(),
+      product_interest: (product_interest || '').trim(),
       lead_source: lead_source || 'Admin Manual Entry',
+      campaign_name: (campaign_name || '').trim(),
       status: targetCallerId ? 'Assigned' : 'Fresh Lead',
       assigned_to: targetCallerId,
       assigned_at: targetCallerId ? new Date() : null,
@@ -189,7 +191,6 @@ export async function PATCH(request) {
     await connectDB();
     const body = await request.json();
 
-    // Auto-redistribute SLA breached / unassigned leads
     if (body.action === 'AUTO_REDISTRIBUTE_SLA') {
       const activeCallers = await User.find({
         role: 'telecaller',
@@ -219,10 +220,10 @@ export async function PATCH(request) {
         idx++;
       }
 
+      purgeDashboardCache();
       return NextResponse.json({ success: true, redistributedCount: stuckLeads.length });
     }
 
-    // Bulk assign multiple leads
     if (Array.isArray(body.leadIds) && body.leadIds.length > 0) {
       if (body.assigned_to === 'ROUND_ROBIN' || body.action === 'ROUND_ROBIN') {
         let activeCallers = await User.find({

@@ -31,7 +31,7 @@ export default function TelecallerManagementPage() {
     team: 'North Region Sales',
     targetCalls: 50,
     targetConversions: 5,
-    password: 'password123'
+    password: ''
   });
 
   const fetchTelecallers = useCallback(async () => {
@@ -82,7 +82,7 @@ export default function TelecallerManagementPage() {
 
   const handleCreateAgent = async (e) => {
     e.preventDefault();
-    if (!newAgent.name || !newAgent.mobile) return;
+    if (!newAgent.name || !newAgent.mobile || !newAgent.password) return;
     setSubmitting(true);
     try {
       const res = await fetch('/api/telecallers', {
@@ -100,7 +100,7 @@ export default function TelecallerManagementPage() {
           team: 'North Region Sales',
           targetCalls: 50,
           targetConversions: 5,
-          password: 'password123'
+          password: ''
         });
         fetchTelecallers();
       }
@@ -429,7 +429,7 @@ export default function TelecallerManagementPage() {
                     value={newAgent.name}
                     onChange={e => setNewAgent({ ...newAgent, name: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
-                    placeholder="e.g. Vikram Rathore"
+                    placeholder="Enter telecaller full name"
                   />
                 </div>
                 <div>
@@ -440,20 +440,30 @@ export default function TelecallerManagementPage() {
                     value={newAgent.mobile}
                     onChange={e => setNewAgent({ ...newAgent, mobile: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
-                    placeholder="9876543219"
+                    placeholder="10-digit mobile number"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Login Password *</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={newAgent.password}
+                    onChange={e => setNewAgent({ ...newAgent, password: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
+                    placeholder="Set login password (min 6 characters)"
                   />
                 </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Assigned Sales Team</label>
-                  <select
+                  <input
+                    type="text"
                     value={newAgent.team}
                     onChange={e => setNewAgent({ ...newAgent, team: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
-                  >
-                    <option value="North Region Sales">North Region Sales</option>
-                    <option value="Bulk Lubricants Ops">Bulk Lubricants Ops</option>
-                    <option value="Field Ops & Followup">Field Ops & Followup</option>
-                  </select>
+                    placeholder="North Region Sales"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
