@@ -1,0 +1,396 @@
+"use client";
+import { useState, useEffect, useCallback } from 'react';
+import Header from '../../components/Header';
+import {
+  Target,
+  TrendingUp,
+  Award,
+  Clock,
+  Sparkles,
+  DollarSign,
+  CheckCircle2,
+  AlertTriangle,
+  Loader2,
+  RefreshCw,
+  Edit3,
+  Save,
+  X,
+  ChevronRight,
+  Zap,
+  BarChart3,
+  Users
+} from 'lucide-react';
+
+export default function GoalsPage() {
+  const [campaigns, setCampaigns] = useState([]);
+  const [metaData, setMetaData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [banner, setBanner] = useState(null);
+
+  // Edit Goal Modal State
+  const [editingGoal, setEditingGoal] = useState(null);
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [goalForm, setGoalForm] = useState({
+    targetLeadsDaily: 25,
+    targetCostPerLead: 30,
+    targetMonthlyBudget: 15000,
+    slaTargetMinutes: 15,
+    conversionRateTarget: 12,
+    notes: ''
+  });
+
+  const showToast = (msg) => {
+    setBanner(msg);
+    setTimeout(() => setBanner(null), 5000);
+  };
+
+  const fetchCampaignGoals = useCallback(async () => {
+    try {
+      const res = await fetch('/api/meta/campaigns');
+      const data = await res.json();
+      if (data.campaigns) {
+        setCampaigns(data.campaigns);
+        setMetaData(data);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCampaignGoals();
+  }, [fetchCampaignGoals]);
+
+  const handleOpenEditGoal = (campaign) => {
+    setEditingGoal(campaign);
+    setGoalForm({
+      targetLeadsDaily: 25,
+      targetCostPerLead: Math.round((campaign.spend || 500) / Math.max(1, campaign.leadsCount || 10)),
+      targetMonthlyBudget: (campaign.dailyBudget || 300) * 30,
+      slaTargetMinutes: 15,
+      conversionRateTarget: 14,
+      notes: `Target performance for ${campaign.name}`
+    });
+  };
+
+  const handleSaveGoal = async (e) => {
+    e.preventDefault();
+    if (!editingGoal) return;
+    setSavingGoal(true);
+    try {
+      const res = await fetch('/api/meta/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SAVE_CAMPAIGN_GOAL',
+          campaignId: editingGoal.campaignId,
+          campaignName: editingGoal.name,
+          ...goalForm
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'Campaign goal updated successfully!');
+        setEditingGoal(null);
+        fetchCampaignGoals();
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save campaign goal.');
+    } finally {
+      setSavingGoal(false);
+    }
+  };
+
+  const totalLeads = campaigns.reduce((acc, c) => acc + (c.leadsCount || 0), 0);
+  const totalSpend = campaigns.reduce((acc, c) => acc + (c.spend || 0), 0);
+  const avgCPL = totalLeads > 0 ? (totalSpend / totalLeads).toFixed(2) : '0.00';
+  const activeCount = campaigns.filter(c => c.status === 'ACTIVE').length;
+
+  return (
+    <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
+      <Header
+        title="Meta Campaign Goals & Performance Objectives"
+        subtitle="Set, monitor and track lead acquisition quotas, target CPL and telecaller conversion milestones for Kisan Choice"
+      />
+
+      <main className="p-6 lg:p-8 space-y-6 flex-1 max-w-7xl mx-auto w-full">
+        {banner && (
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+              <span>{banner}</span>
+            </div>
+            <button onClick={() => setBanner(null)} className="text-emerald-700 hover:text-emerald-900">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {/* Overview KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Active Campaigns</span>
+              <Target size={16} className="text-blue-600" />
+            </div>
+            <div className="text-2xl font-heading font-extrabold text-slate-900 tabular-nums">
+              {activeCount} / {campaigns.length}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1 font-medium">Meta Ad Account: act_1796071777698019</div>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Total Leads Acquired</span>
+              <Users size={16} className="text-emerald-600" />
+            </div>
+            <div className="text-2xl font-heading font-extrabold text-emerald-700 tabular-nums">
+              {totalLeads}
+            </div>
+            <div className="text-[11px] text-emerald-600 mt-1 font-medium">Synced from live Meta forms</div>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Average Cost Per Lead</span>
+              <DollarSign size={16} className="text-indigo-600" />
+            </div>
+            <div className="text-2xl font-heading font-extrabold text-indigo-700 tabular-nums">
+              ₹{avgCPL}
+            </div>
+            <div className="text-[11px] text-indigo-600 mt-1 font-medium">Target Benchmark: &lt; ₹35 / Lead</div>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider">SLA Response Benchmark</span>
+              <Clock size={16} className="text-amber-600" />
+            </div>
+            <div className="text-2xl font-heading font-extrabold text-slate-900 tabular-nums">
+              &lt; 15 Mins
+            </div>
+            <div className="text-[11px] text-amber-700 mt-1 font-medium">Speed to First Call Target</div>
+          </div>
+        </div>
+
+        {/* Campaign Goals Matrix Table */}
+        <div className="bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-xs">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h3 className="font-heading font-bold text-sm text-slate-900 flex items-center gap-2">
+                <Target size={16} className="text-blue-600" /> Campaign Performance Goals & Quotas
+              </h3>
+              <p className="text-xs text-slate-500">
+                Track daily lead acquisition pace, target cost-per-lead and SLA adherence for each active campaign
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setRefreshing(true);
+                fetchCampaignGoals();
+              }}
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+              <span>Refresh Goals</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/70 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3.5 px-5">Campaign Name</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4 text-center">Daily Lead Target</th>
+                  <th className="py-3.5 px-4 text-right">Spend</th>
+                  <th className="py-3.5 px-4 text-center">Current Leads</th>
+                  <th className="py-3.5 px-4 text-center">Est. CPL</th>
+                  <th className="py-3.5 px-4">Routing Team</th>
+                  <th className="py-3.5 px-5 text-right">Configure Goal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {loading ? (
+                  <tr>
+                    <td colSpan="8" className="py-12 text-center text-slate-400">
+                      <Loader2 size={24} className="animate-spin text-blue-600 mx-auto mb-2" />
+                      <span>Loading campaign goals from Meta Graph API...</span>
+                    </td>
+                  </tr>
+                ) : campaigns.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="py-12 text-center text-slate-400">
+                      No campaigns found in Ad Account act_1796071777698019.
+                    </td>
+                  </tr>
+                ) : (
+                  campaigns.map((c) => {
+                    const cpl = c.leadsCount > 0 ? (c.spend / c.leadsCount).toFixed(1) : (c.spend > 0 ? c.spend.toFixed(1) : '25.0');
+                    const isHealthy = Number(cpl) <= 35;
+                    return (
+                      <tr key={c.campaignId} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-4 px-5">
+                          <div className="font-bold text-slate-900">{c.name}</div>
+                          <div className="text-[11px] font-mono text-slate-400 mt-0.5">ID: {c.campaignId}</div>
+                        </td>
+
+                        <td className="py-4 px-4">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                              c.status === 'ACTIVE'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-slate-100 text-slate-500 border-slate-200'
+                            }`}
+                          >
+                            {c.status}
+                          </span>
+                        </td>
+
+                        <td className="py-4 px-4 text-center font-heading font-extrabold text-blue-700 tabular-nums text-sm">
+                          25 / day
+                        </td>
+
+                        <td className="py-4 px-4 text-right font-medium text-slate-700 tabular-nums">
+                          ₹{c.spend ? Number(c.spend).toFixed(2) : '0.00'}
+                        </td>
+
+                        <td className="py-4 px-4 text-center font-heading font-extrabold text-slate-900 tabular-nums text-sm">
+                          {c.leadsCount || 0}
+                        </td>
+
+                        <td className="py-4 px-4 text-center">
+                          <span
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold tabular-nums ${
+                              isHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                            }`}
+                          >
+                            ₹{cpl}
+                          </span>
+                        </td>
+
+                        <td className="py-4 px-4 font-semibold text-slate-700">
+                          {c.assignedTeam || 'North Region Sales'}
+                        </td>
+
+                        <td className="py-4 px-5 text-right">
+                          <button
+                            onClick={() => handleOpenEditGoal(c)}
+                            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 ml-auto transition-colors cursor-pointer"
+                          >
+                            <Edit3 size={12} />
+                            <span>Set Goal</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Goal Edit Modal */}
+        {editingGoal && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-scaleIn">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading font-extrabold text-base text-slate-900 flex items-center gap-2">
+                    <Target size={18} className="text-blue-600" /> Set Goal: {editingGoal.name}
+                  </h3>
+                  <p className="text-xs text-slate-500">Configure target metrics for this Meta campaign</p>
+                </div>
+                <button
+                  onClick={() => setEditingGoal(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveGoal} className="p-6 space-y-4 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Daily Lead Target</label>
+                    <input
+                      type="number"
+                      value={goalForm.targetLeadsDaily}
+                      onChange={(e) => setGoalForm({ ...goalForm, targetLeadsDaily: Number(e.target.value) })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Target CPL (₹)</label>
+                    <input
+                      type="number"
+                      value={goalForm.targetCostPerLead}
+                      onChange={(e) => setGoalForm({ ...goalForm, targetCostPerLead: Number(e.target.value) })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Monthly Budget Goal (₹)</label>
+                    <input
+                      type="number"
+                      value={goalForm.targetMonthlyBudget}
+                      onChange={(e) => setGoalForm({ ...goalForm, targetMonthlyBudget: Number(e.target.value) })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Target Conversion Rate (%)</label>
+                    <input
+                      type="number"
+                      value={goalForm.conversionRateTarget}
+                      onChange={(e) => setGoalForm({ ...goalForm, conversionRateTarget: Number(e.target.value) })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Strategy & Notes</label>
+                  <textarea
+                    rows={2}
+                    value={goalForm.notes}
+                    onChange={(e) => setGoalForm({ ...goalForm, notes: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                    placeholder="Focus on high-intent distributor inquiries in eastern UP..."
+                  />
+                </div>
+
+                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setEditingGoal(null)}
+                    className="px-4 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingGoal}
+                    className="px-5 py-2 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {savingGoal ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                    <span>Save Goal</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

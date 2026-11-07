@@ -282,9 +282,7 @@ export default function LeadsPage() {
               className="px-3.5 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none cursor-pointer"
             >
               <option value="">All Sources</option>
-              <option value="Facebook Meta Lead Ads">Facebook Meta Lead Ads</option>
-              <option value="WhatsApp API">WhatsApp API</option>
-              <option value="Google Sheets">Google Sheets</option>
+              <option value="Facebook Meta Lead Ads">Facebook & Instagram Lead Ads</option>
               <option value="Direct Phone / Manual CRM Entry">Direct Manual Entry</option>
             </select>
 

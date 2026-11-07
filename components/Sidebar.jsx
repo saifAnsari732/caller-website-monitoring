@@ -18,7 +18,10 @@ import {
   Activity,
   ChevronDown,
   Workflow,
-  Sparkles
+  Sparkles,
+  Target,
+  Rocket,
+  Globe
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -29,8 +32,11 @@ export default function Sidebar() {
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Contacts & Leads', href: '/leads', icon: Users },
     { name: 'Pipeline & Campaigns', href: '/campaigns', icon: Megaphone },
+    { name: 'Campaign Goals', href: '/goal', icon: Target, badge: 'GOAL' },
+    { name: 'Campaign Boost', href: '/boost', icon: Rocket, badge: 'BOOST' },
+    { name: 'Forms Browser', href: '/browser', icon: Globe, badge: 'META' },
     { name: 'Meta Live Leads', href: '/meta-leads', icon: Zap, badge: 'LIVE' },
-    { name: 'Integrations', href: '/settings', icon: Workflow },
+    { name: 'Meta Integrations', href: '/settings', icon: Workflow },
     { name: 'Call Logs', href: '/calls', icon: PhoneCall },
     { name: 'Follow-ups', href: '/followups', icon: Calendar },
     { name: 'WhatsApp Templates', href: '/templates', icon: MessageSquare },

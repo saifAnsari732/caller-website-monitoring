@@ -367,8 +367,6 @@ export default function Dashboard() {
   const sourceOptions = useMemo(() => {
     const set = new Set([
       'Facebook Meta Lead Ads',
-      'WhatsApp API',
-      'Google Sheets',
       'Direct Phone / Manual CRM Entry'
     ]);
     if (data?.availableSources) {
@@ -386,9 +384,8 @@ export default function Dashboard() {
       ALL: rawRecentLeads.length,
       META: rawRecentLeads.filter(l => {
         const s = (l.lead_source || '').toLowerCase();
-        return s.includes('meta') || s.includes('facebook');
+        return s.includes('meta') || s.includes('facebook') || s.includes('instagram');
       }).length,
-      WHATSAPP: rawRecentLeads.filter(l => (l.lead_source || '').toLowerCase().includes('whatsapp')).length,
       FRESH: rawRecentLeads.filter(l => ['Fresh Lead', 'Assigned'].includes(l.status)).length,
       UNASSIGNED: rawRecentLeads.filter(l => !l.assignedTo || l.assignedTo === 'Unassigned').length,
       SLA: rawRecentLeads.filter(l => l.call_attempts === 0 && ['Fresh Lead', 'Assigned'].includes(l.status)).length,
@@ -402,9 +399,7 @@ export default function Dashboard() {
       // 1. Quick Presets
       if (quickPreset === 'META') {
         const s = (lead.lead_source || '').toLowerCase();
-        if (!s.includes('meta') && !s.includes('facebook')) return false;
-      } else if (quickPreset === 'WHATSAPP') {
-        if (!(lead.lead_source || '').toLowerCase().includes('whatsapp')) return false;
+        if (!s.includes('meta') && !s.includes('facebook') && !s.includes('instagram')) return false;
       } else if (quickPreset === 'FRESH') {
         if (!['Fresh Lead', 'Assigned'].includes(lead.status)) return false;
       } else if (quickPreset === 'UNASSIGNED') {
@@ -813,17 +808,6 @@ export default function Dashboard() {
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
                     Meta Ads Leads ({presetCounts.META})
-                  </button>
-                  <button
-                    onClick={() => setQuickPreset('WHATSAPP')}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-                      quickPreset === 'WHATSAPP'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                    WhatsApp Inbound ({presetCounts.WHATSAPP})
                   </button>
                   <button
                     onClick={() => setQuickPreset('FRESH')}

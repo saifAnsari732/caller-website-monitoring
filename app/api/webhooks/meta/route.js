@@ -46,7 +46,7 @@ export async function GET(request) {
       endpoint: '/api/webhooks/meta',
       source: source || 'facebook_instagram',
       verifyTokenConfigured: true,
-      message: 'KisanConnect Multi-Channel Lead Webhook Receiver is online.'
+      message: 'Kisan Choice Meta Lead Ads Webhook Receiver is online.'
     });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });

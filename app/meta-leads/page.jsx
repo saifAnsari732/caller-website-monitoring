@@ -110,11 +110,11 @@ export default function MetaLeadsPage() {
       const res = await fetch('/api/meta/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_FORM_LEADS', formId: targetForm, count: 2 })
+        body: JSON.stringify({ action: 'SYNC_FORM_LEADS', formId: targetForm, count: 10 })
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`Synced ${data.syncedCount} new leads from "${data.formName}" and auto-assigned to telecallers!`);
+        showToast(data.message || `Synced ${data.syncedCount} new leads from "${data.formName}" and auto-assigned to telecallers!`);
         fetchLeads();
       }
     } catch (e) {

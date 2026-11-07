@@ -223,10 +223,28 @@ export default function CampaignsPage() {
               )}
             </button>
             <Link
-              href="/settings"
-              className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
+              href="/goal"
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
             >
-              <Zap size={14} className="text-purple-600" /> OAuth Settings
+              <Target size={14} className="text-blue-600" /> Goals
+            </Link>
+            <Link
+              href="/boost"
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
+            >
+              <Zap size={14} className="text-amber-500" /> Boost
+            </Link>
+            <Link
+              href="/browser"
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
+            >
+              <Sparkles size={14} className="text-purple-600" /> Forms Browser
+            </Link>
+            <Link
+              href="/settings"
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
+            >
+              OAuth Settings
             </Link>
           </div>
         </div>
