@@ -39,7 +39,7 @@ export default function Sidebar() {
     { name: 'Meta Integrations', href: '/settings', icon: Workflow },
     { name: 'Call Logs', href: '/calls', icon: PhoneCall },
     { name: 'Follow-ups', href: '/followups', icon: Calendar },
-    { name: 'WhatsApp Templates', href: '/templates', icon: MessageSquare },
+    { name: 'Pitch & Message Templates', href: '/templates', icon: MessageSquare },
     { name: 'Reports', href: '/reports', icon: FileText },
     { name: 'Performance Matrix', href: '/performance', icon: TrendingUp },
   ];
