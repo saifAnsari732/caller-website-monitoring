@@ -792,14 +792,34 @@ export default function SettingsPage() {
                 </div>
 
                 {capiTestResult && (
-                  <div className="p-4 rounded-2xl bg-slate-900 text-white text-xs font-mono space-y-2 mt-3 overflow-x-auto">
-                    <div className="flex justify-between text-slate-400 text-[11px]">
-                      <span>Status: {capiTestResult.status}</span>
-                      <span>Latency: {capiTestResult.latencyMs}ms</span>
+                  <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-slate-800 text-xs space-y-2.5 mt-3 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                        <span>Conversion Event Dispatched Successfully</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-semibold text-[11px]">
+                        {capiTestResult.latencyMs}ms
+                      </span>
                     </div>
-                    <pre className="text-[11px] text-emerald-400 overflow-x-auto">
-                      {JSON.stringify(capiTestResult.payloadSent, null, 2)}
-                    </pre>
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">Event Type:</span>
+                        <strong className="text-slate-900">{capiTestResult.logItem?.eventName || 'QualifiedLead'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">Attributed Value:</span>
+                        <strong className="text-emerald-700 font-bold">₹{capiTestResult.logItem?.value || 2500}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">Target Prospect:</span>
+                        <strong className="text-slate-900">{capiTestResult.logItem?.leadName || 'Distributor Lead'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">Meta Status:</span>
+                        <strong className="text-blue-700 font-semibold">{capiTestResult.status}</strong>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
