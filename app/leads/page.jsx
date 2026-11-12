@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '../../components/Header';
+import { useAuth } from '../../components/AuthProvider';
 import {
   Search,
   Download,
@@ -62,6 +63,7 @@ function formatLeadDate(dateVal) {
 }
 
 export default function LeadsPage() {
+  const { user } = useAuth();
   const [leads, setLeads] = useState([]);
   const [users, setUsers] = useState([]);
   const [campaignOptions, setCampaignOptions] = useState([]);
@@ -99,7 +101,7 @@ export default function LeadsPage() {
   const [inspectorData, setInspectorData] = useState(null);
   const [loadingInspector, setLoadingInspector] = useState(false);
 
-  // Column visibility
+  // Column visibility matching NeoDove specifications
   const [showColMenu, setShowColMenu] = useState(false);
   const [columns, setColumns] = useState({
     no: true,
@@ -112,8 +114,38 @@ export default function LeadsPage() {
     stage: true,
     tag: true,
     userAssigned: true,
+    followUpTime: true,
+    leadStatus: true,
+    dealAmount: true,
+    lastCallDate: true,
+    callAttemptCount: true,
+    joinAs: true,
+    startTimeline: true,
+    city: true,
     action: true
   });
+
+  const COLUMN_LABELS = {
+    no: 'No.',
+    name: 'Name',
+    number: 'Number',
+    email: 'Email',
+    campaign: 'Campaign Name',
+    creationDate: 'Creation Date',
+    updatedAt: 'Updated at',
+    stage: 'Lead Stage',
+    tag: 'Tag',
+    userAssigned: 'User Assigned',
+    followUpTime: 'Follow-Up Time',
+    leadStatus: 'Lead Status',
+    dealAmount: 'Deal Amount',
+    lastCallDate: 'Last Call Date',
+    callAttemptCount: 'Call Attempt Count',
+    joinAs: 'आप_किस_रूप_में_जुड़ना_चाहते_हैं?',
+    startTimeline: 'आप_कब_शुरू_करना_चाहेंगे?',
+    city: 'City',
+    action: 'Action'
+  };
 
   // New Lead Form State
   const [newLead, setNewLead] = useState({
@@ -125,6 +157,10 @@ export default function LeadsPage() {
     campaign_name: '',
     business_type: '',
     product_interest: '',
+    join_as: '',
+    start_timeline: '',
+    deal_amount: 0,
+    lead_status: 'In-Progress',
     assigned_to: '',
     status: 'Fresh Inquiry',
     priority: 'Normal',
@@ -345,6 +381,12 @@ export default function LeadsPage() {
           city: editingLead.city,
           state: editingLead.state,
           assigned_to: editingLead.assigned_to?._id || editingLead.assigned_to || null,
+          lead_status: editingLead.lead_status || 'In-Progress',
+          deal_amount: Number(editingLead.deal_amount) || 0,
+          follow_up_time: editingLead.follow_up_time || null,
+          join_as: editingLead.join_as || '',
+          start_timeline: editingLead.start_timeline || '',
+          call_attempts: Number(editingLead.call_attempts) || 0,
           notes: editingLead.notes
         })
       });
@@ -391,18 +433,65 @@ export default function LeadsPage() {
     }
   };
 
-  // Export CSV
+  // Export CSV with All 18 NeoDove Fields (UTF-8 encoded)
   const handleExportCSV = () => {
-    const header = 'No,LeadID,Name,Number,Email,CampaignName,CreationDate,UpdatedAt,LeadStage,Tag,UserAssigned';
+    const headers = [
+      'No.',
+      'Name',
+      'Number',
+      'Email',
+      'Campaign Name',
+      'Creation Date',
+      'Updated at',
+      'Lead Stage',
+      'Tag',
+      'User Assigned',
+      'Follow-Up Time',
+      'Lead Status',
+      'Deal Amount',
+      'Last Call Date',
+      'Call Attempt Count',
+      'आप_किस_रूप_में_जुड़ना_चाहते_हैं?',
+      'आप_कब_शुरू_करना_चाहेंगे?',
+      'City'
+    ];
+
     const rows = leads.map((l, idx) => {
       const no = (page - 1) * limit + idx + 1;
-      const tag = l.priority === 'High' || l.priority === 'VIP' ? 'Hot' : 'Hot';
-      return `"${no}","${l.lead_id || ''}","${l.name || ''}","${l.mobile || ''}","${l.email || ''}","${l.campaign_name || ''}","${formatLeadDate(l.createdAt)}","${formatLeadDate(l.updatedAt || l.createdAt)}","${l.status || 'Fresh Inquiry'}","${tag}","${l.assigned_to?.name || 'Unassigned'}"`;
+      const tag = l.priority === 'High' || l.priority === 'VIP' ? 'Hot' : (l.tags?.[0] || 'Hot');
+      const followUp = l.follow_up_time ? formatLeadDate(l.follow_up_time) : '—';
+      const lastCall = l.last_contacted_at ? formatLeadDate(l.last_contacted_at) : '—';
+      const dealAmt = l.deal_amount ? `₹${l.deal_amount}` : '—';
+      const joinAs = l.join_as || l.business_type || '—';
+      const startTimeline = l.start_timeline || l.product_interest || '—';
+      const city = l.city || l.state || '—';
+
+      return [
+        no,
+        l.name || '',
+        l.mobile || '',
+        l.email || '',
+        l.campaign_name || 'Agra',
+        formatLeadDate(l.createdAt),
+        formatLeadDate(l.updatedAt || l.createdAt),
+        l.status || 'Fresh Inquiry',
+        tag,
+        l.assigned_to?.name || 'Unassigned',
+        followUp,
+        l.lead_status || 'In-Progress',
+        dealAmt,
+        lastCall,
+        l.call_attempts || 0,
+        joinAs,
+        startTimeline,
+        city
+      ].map(val => `"${String(val ?? '').replace(/"/g, '""')}"`).join(',');
     });
-    const csvContent = 'data:text/csv;charset=utf-8,' + [header, ...rows].join('\n');
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.map(h => `"${h}"`).join(','), ...rows].join('\n');
     const link = document.createElement('a');
     link.setAttribute('href', encodeURI(csvContent));
-    link.setAttribute('download', `Leads_Export_${Date.now()}.csv`);
+    link.setAttribute('download', `Kisan_India_Leads_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -411,11 +500,17 @@ export default function LeadsPage() {
   const startIndex = totalLeads === 0 ? 0 : (page - 1) * limit + 1;
   const endIndex = Math.min(page * limit, totalLeads);
 
+  const isFreshDirectory = totalLeads === 0 && !loading && !search && activeFilterCount === 0;
+
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
       <Header
         title="Lead Directory & Management"
-        subtitle="Manage captured prospect leads, assign telecallers, filter pipeline stages & inspect complete audit logs"
+        subtitle={
+          user?.name
+            ? `${user.name.toUpperCase()} — Manage captured prospect leads, assign telecallers, filter pipeline stages & inspect complete audit logs`
+            : "Manage captured prospect leads, assign telecallers, filter pipeline stages & inspect complete audit logs"
+        }
       />
 
       <main className="p-4 sm:p-6 lg:p-8 flex-1 flex flex-col space-y-4">
@@ -557,19 +652,19 @@ export default function LeadsPage() {
               </button>
 
               {showColMenu && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-30 text-xs space-y-1">
-                  <p className="px-2 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    Display Columns
+                <div className="absolute right-0 top-full mt-2 w-64 max-h-96 overflow-y-auto bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-30 text-xs space-y-1">
+                  <p className="px-2 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 bg-white">
+                    Display Columns (NeoDove View)
                   </p>
                   {Object.keys(columns).map((colKey) => (
-                    <label key={colKey} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer font-medium text-slate-700 capitalize">
+                    <label key={colKey} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer font-medium text-slate-700">
                       <input
                         type="checkbox"
                         checked={columns[colKey]}
                         onChange={(e) => setColumns({ ...columns, [colKey]: e.target.checked })}
                         className="rounded border-slate-300 text-blue-600 accent-blue-600"
                       />
-                      <span>{colKey.replace(/([A-Z])/g, ' $1')}</span>
+                      <span className="truncate">{COLUMN_LABELS[colKey] || colKey}</span>
                     </label>
                   ))}
                 </div>
@@ -664,7 +759,7 @@ export default function LeadsPage() {
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left border-collapse">
               <thead className="bg-[#FAFBFD] border-b border-slate-200/80 sticky top-0 z-10">
-                <tr className="text-[12px] font-semibold text-slate-500 whitespace-nowrap">
+                <tr className="text-[12px] font-bold text-blue-700 whitespace-nowrap">
                   <th className="py-3 px-3 w-10 text-center">
                     <input
                       type="checkbox"
@@ -674,17 +769,25 @@ export default function LeadsPage() {
                       className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
                     />
                   </th>
-                  {columns.no && <th className="py-3 px-3 font-semibold text-slate-500">No.</th>}
-                  {columns.name && <th className="py-3 px-4 font-semibold text-slate-500">Name</th>}
-                  {columns.number && <th className="py-3 px-4 font-semibold text-slate-500">Number</th>}
-                  {columns.email && <th className="py-3 px-4 font-semibold text-slate-500">Email</th>}
-                  {columns.campaign && <th className="py-3 px-4 font-semibold text-slate-500">Campaign Name</th>}
-                  {columns.creationDate && <th className="py-3 px-4 font-semibold text-slate-500">Creation Date</th>}
-                  {columns.updatedAt && <th className="py-3 px-4 font-semibold text-slate-500">Updated at</th>}
-                  {columns.stage && <th className="py-3 px-4 font-semibold text-slate-500">Lead Stage</th>}
-                  {columns.tag && <th className="py-3 px-3 font-semibold text-slate-500">Tag</th>}
-                  {columns.userAssigned && <th className="py-3 px-4 font-semibold text-slate-500">User Assigned</th>}
-                  {columns.action && <th className="py-3 px-4 font-semibold text-slate-500 text-right">Action</th>}
+                  {columns.no && <th className="py-3 px-3 font-bold text-blue-700">No.</th>}
+                  {columns.name && <th className="py-3 px-4 font-bold text-blue-700">Name</th>}
+                  {columns.number && <th className="py-3 px-4 font-bold text-blue-700">Number</th>}
+                  {columns.email && <th className="py-3 px-4 font-bold text-blue-700">Email</th>}
+                  {columns.campaign && <th className="py-3 px-4 font-bold text-blue-700">Campaign Name</th>}
+                  {columns.creationDate && <th className="py-3 px-4 font-bold text-blue-700">Creation Date</th>}
+                  {columns.updatedAt && <th className="py-3 px-4 font-bold text-blue-700">Updated at</th>}
+                  {columns.stage && <th className="py-3 px-4 font-bold text-blue-700">Lead Stage</th>}
+                  {columns.tag && <th className="py-3 px-3 font-bold text-blue-700">Tag</th>}
+                  {columns.userAssigned && <th className="py-3 px-4 font-bold text-blue-700">User Assigned</th>}
+                  {columns.followUpTime && <th className="py-3 px-4 font-bold text-blue-700">Follow-Up Time</th>}
+                  {columns.leadStatus && <th className="py-3 px-4 font-bold text-blue-700">Lead Status</th>}
+                  {columns.dealAmount && <th className="py-3 px-4 font-bold text-blue-700">Deal Amount</th>}
+                  {columns.lastCallDate && <th className="py-3 px-4 font-bold text-blue-700">Last Call Date</th>}
+                  {columns.callAttemptCount && <th className="py-3 px-4 font-bold text-blue-700 text-center">Call Attempt Count</th>}
+                  {columns.joinAs && <th className="py-3 px-4 font-bold text-blue-700">आप_किस_रूप_में_जुड़ना_चाहते_हैं?</th>}
+                  {columns.startTimeline && <th className="py-3 px-4 font-bold text-blue-700">आप_कब_शुरू_करना_चाहेंगे?</th>}
+                  {columns.city && <th className="py-3 px-4 font-bold text-blue-700">City</th>}
+                  {columns.action && <th className="py-3 px-4 font-bold text-blue-700 text-right">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -697,17 +800,39 @@ export default function LeadsPage() {
                   </tr>
                 ) : leads.length === 0 ? (
                   <tr>
-                    <td colSpan="12" className="py-16 text-center text-slate-400">
-                      <ShieldAlert size={30} className="mx-auto mb-2 text-slate-300" />
-                      <p className="text-sm font-bold text-slate-700">No matching leads found</p>
-                      <p className="text-xs text-slate-400 mt-1">Try resetting filters or adjusting search keyword.</p>
-                      {activeFilterCount > 0 && (
-                        <button
-                          onClick={resetAllFilters}
-                          className="mt-3 px-3.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold cursor-pointer"
-                        >
-                          Clear All Filters
-                        </button>
+                    <td colSpan="18" className="py-16 text-center">
+                      {isFreshDirectory ? (
+                        <div className="max-w-md mx-auto space-y-3">
+                          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-2xs border border-blue-100">
+                            <UserPlus size={22} />
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-800">Your Lead Directory is Fresh &amp; Ready</h4>
+                          <p className="text-xs text-slate-500">
+                            No prospect leads have been added to your account yet. Add a lead manually or sync directly from Facebook &amp; Instagram Meta Ads.
+                          </p>
+                          <div className="flex items-center justify-center gap-2 pt-2">
+                            <button
+                              onClick={() => setShowAddModal(true)}
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <UserPlus size={14} /> Add First Lead
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-slate-400">
+                          <ShieldAlert size={30} className="mx-auto mb-2 text-slate-300" />
+                          <p className="text-sm font-bold text-slate-700">No matching leads found</p>
+                          <p className="text-xs text-slate-400 mt-1">Try resetting filters or adjusting search keyword.</p>
+                          {activeFilterCount > 0 && (
+                            <button
+                              onClick={resetAllFilters}
+                              className="mt-3 px-3.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold cursor-pointer"
+                            >
+                              Clear All Filters
+                            </button>
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -747,10 +872,15 @@ export default function LeadsPage() {
                           </td>
                         )}
 
-                        {/* Name */}
+                        {/* Name with Avatar */}
                         {columns.name && (
                           <td className="py-3.5 px-4 font-semibold text-slate-900 whitespace-nowrap">
-                            {lead.name || '—'}
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                {lead.name?.[0]?.toUpperCase() || 'L'}
+                              </span>
+                              <span title={lead.name}>{lead.name || '—'}</span>
+                            </div>
                           </td>
                         )}
 
@@ -763,14 +893,14 @@ export default function LeadsPage() {
 
                         {/* Email */}
                         {columns.email && (
-                          <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap max-w-[170px] truncate" title={lead.email}>
-                            {lead.email || ''}
+                          <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap max-w-[160px] truncate" title={lead.email}>
+                            {lead.email || '—'}
                           </td>
                         )}
 
                         {/* Campaign Name */}
                         {columns.campaign && (
-                          <td className="py-3.5 px-4 font-medium text-slate-800 whitespace-nowrap">
+                          <td className="py-3.5 px-4 font-medium text-slate-800 whitespace-nowrap max-w-[190px] truncate" title={lead.campaign_name}>
                             {lead.campaign_name || 'Agra'}
                           </td>
                         )}
@@ -809,6 +939,64 @@ export default function LeadsPage() {
                         {columns.userAssigned && (
                           <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-800">
                             {lead.assigned_to?.name || 'Unassigned'}
+                          </td>
+                        )}
+
+                        {/* Follow-Up Time */}
+                        {columns.followUpTime && (
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 text-[11px] tabular-nums">
+                            {lead.follow_up_time ? formatLeadDate(lead.follow_up_time) : '—'}
+                          </td>
+                        )}
+
+                        {/* Lead Status */}
+                        {columns.leadStatus && (
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 font-medium">
+                            {lead.lead_status || 'In-Progress'}
+                          </td>
+                        )}
+
+                        {/* Deal Amount */}
+                        {columns.dealAmount && (
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 font-medium tabular-nums">
+                            {lead.deal_amount ? `₹${Number(lead.deal_amount).toLocaleString('en-IN')}` : '—'}
+                          </td>
+                        )}
+
+                        {/* Last Call Date */}
+                        {columns.lastCallDate && (
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 text-[11px] tabular-nums">
+                            {lead.last_contacted_at ? formatLeadDate(lead.last_contacted_at) : '—'}
+                          </td>
+                        )}
+
+                        {/* Call Attempt Count */}
+                        {columns.callAttemptCount && (
+                          <td className="py-3.5 px-4 whitespace-nowrap text-center">
+                            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px] tabular-nums">
+                              {lead.call_attempts || 0}
+                            </span>
+                          </td>
+                        )}
+
+                        {/* आप_किस_रूप_में_जुड़ना_चाहते_हैं? */}
+                        {columns.joinAs && (
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 max-w-[200px] truncate" title={lead.join_as || lead.business_type}>
+                            {lead.join_as || lead.business_type || '—'}
+                          </td>
+                        )}
+
+                        {/* आप_कब_शुरू_करना_चाहेंगे? */}
+                        {columns.startTimeline && (
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 max-w-[180px] truncate" title={lead.start_timeline || lead.product_interest}>
+                            {lead.start_timeline || lead.product_interest || '—'}
+                          </td>
+                        )}
+
+                        {/* City */}
+                        {columns.city && (
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-800 font-medium">
+                            {lead.city || lead.state || '—'}
                           </td>
                         )}
 
@@ -1063,6 +1251,75 @@ export default function LeadsPage() {
                     type="text"
                     value={editingLead.city || ''}
                     onChange={(e) => setEditingLead({ ...editingLead, city: e.target.value })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Lead Status</label>
+                  <select
+                    value={editingLead.lead_status || 'In-Progress'}
+                    onChange={(e) => setEditingLead({ ...editingLead, lead_status: e.target.value })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="In-Progress">In-Progress</option>
+                    <option value="Open">Open</option>
+                    <option value="Won">Won</option>
+                    <option value="Lost">Lost</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Deal Amount (₹)</label>
+                  <input
+                    type="number"
+                    value={editingLead.deal_amount || 0}
+                    onChange={(e) => setEditingLead({ ...editingLead, deal_amount: Number(e.target.value) })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Follow-Up Time</label>
+                  <input
+                    type="datetime-local"
+                    value={editingLead.follow_up_time ? new Date(editingLead.follow_up_time).toISOString().slice(0, 16) : ''}
+                    onChange={(e) => setEditingLead({ ...editingLead, follow_up_time: e.target.value })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Call Attempt Count</label>
+                  <input
+                    type="number"
+                    value={editingLead.call_attempts || 0}
+                    onChange={(e) => setEditingLead({ ...editingLead, call_attempts: Number(e.target.value) })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">आप किस रूप में जुड़ना चाहते हैं?</label>
+                  <input
+                    type="text"
+                    value={editingLead.join_as || editingLead.business_type || ''}
+                    onChange={(e) => setEditingLead({ ...editingLead, join_as: e.target.value, business_type: e.target.value })}
+                    placeholder="e.g. distributor (डिस्ट्रीब्यूटर), trader (ट्रेडर)"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">आप कब शुरू करना चाहेंगे?</label>
+                  <input
+                    type="text"
+                    value={editingLead.start_timeline || editingLead.product_interest || ''}
+                    onChange={(e) => setEditingLead({ ...editingLead, start_timeline: e.target.value, product_interest: e.target.value })}
+                    placeholder="e.g. तुरंत, एक सप्ताह के भीतर"
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>

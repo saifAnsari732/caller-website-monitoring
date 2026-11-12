@@ -214,10 +214,13 @@ export default function Sidebar() {
                   {!isCollapsedView && item.liveDot && (
                     <span
                       title="Live webhook stream active"
-                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-400/40 text-emerald-300"
+                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : 'text-emerald-600'
+                      }`}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      LIVE
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     </span>
                   )}
                 </Link>

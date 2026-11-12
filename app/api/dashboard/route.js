@@ -6,10 +6,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
-    if (!(await requireAdminApi(request))) {
+    const adminPayload = await requireAdminApi(request);
+    if (!adminPayload) {
       return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
     }
-    const data = await getCachedDashboardData();
+    const data = await getCachedDashboardData(adminPayload.id);
     return NextResponse.json(data, {
       headers: getCacheHeaders(15, 60)
     });

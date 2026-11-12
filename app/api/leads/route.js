@@ -5,7 +5,7 @@ import User from '../../../lib/models/User';
 import Call from '../../../lib/models/Call';
 import Followup from '../../../lib/models/Followup';
 import SystemSetting from '../../../lib/models/SystemSetting';
-import { purgeDashboardCache } from '../../../lib/cache';
+import { purgeDashboardCache, getLeadFilterForAdmin } from '../../../lib/cache';
 import { requireAdminApi } from '../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -35,16 +35,18 @@ async function pickCallerForDistribution(activeCallers, strategy) {
 
 export async function GET(request) {
   try {
-    if (!(await requireAdminApi(request))) {
+    const adminPayload = await requireAdminApi(request);
+    if (!adminPayload) {
       return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
     }
     await connectDB();
+    const leadFilter = getLeadFilterForAdmin(adminPayload.id);
     const { searchParams } = new URL(request.url);
     const detailId = searchParams.get('detailId') || '';
 
     if (detailId) {
       const [lead, calls, followups] = await Promise.all([
-        Lead.findById(detailId).populate('assigned_to', 'name mobile employee_id').lean(),
+        Lead.findOne({ _id: detailId, ...leadFilter }).populate('assigned_to', 'name mobile employee_id').lean(),
         Call.find({ lead: detailId }).populate('caller', 'name').sort({ start_time: -1 }).lean(),
         Followup.find({ lead: detailId }).populate('caller', 'name').sort({ date: -1, time: -1 }).lean()
       ]);
@@ -62,7 +64,7 @@ export async function GET(request) {
     const limit = Math.max(1, Math.min(200, parseInt(searchParams.get('limit') || '50', 10)));
     const skip = (page - 1) * limit;
 
-    const query = {};
+    const query = { ...leadFilter };
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -139,6 +141,10 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const adminPayload = await requireAdminApi(request);
+    if (!adminPayload) {
+      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    }
     await connectDB();
     const body = await request.json();
 
@@ -163,6 +169,7 @@ export async function POST(request) {
         if (!item.name || !mobileVal) continue;
         const chosenCaller = await pickCallerForDistribution(activeCallers, strategy);
         const doc = await Lead.create({
+          admin_id: adminPayload.id,
           name: String(item.name).trim(),
           mobile: mobileVal,
           email: (item.email || '').trim(),
@@ -179,7 +186,7 @@ export async function POST(request) {
         });
         createdLeads.push(doc);
       }
-      purgeDashboardCache();
+      purgeDashboardCache(adminPayload.id);
       return NextResponse.json({ success: true, count: createdLeads.length }, { status: 201 });
     }
 
@@ -195,6 +202,7 @@ export async function POST(request) {
     }
 
     const newLead = await Lead.create({
+      admin_id: adminPayload.id,
       name: String(name).trim(),
       mobile: String(mobile).trim(),
       email: (email || '').trim(),
@@ -210,7 +218,7 @@ export async function POST(request) {
       notes: notes || ''
     });
 
-    purgeDashboardCache();
+    purgeDashboardCache(adminPayload.id);
     const populated = await Lead.findById(newLead._id).populate('assigned_to', 'name _id mobile').lean();
     return NextResponse.json({ success: true, lead: populated }, { status: 201 });
   } catch (error) {
@@ -309,7 +317,26 @@ export async function PATCH(request) {
       return NextResponse.json({ success: true, count: body.leadIds.length });
     }
 
-    const { leadId, name, mobile, email, city, state, campaign_name, tags, assigned_to, status, notes, priority } = body;
+    const {
+      leadId,
+      name,
+      mobile,
+      email,
+      city,
+      state,
+      campaign_name,
+      tags,
+      assigned_to,
+      status,
+      notes,
+      priority,
+      lead_status,
+      deal_amount,
+      follow_up_time,
+      join_as,
+      start_timeline,
+      call_attempts
+    } = body;
     if (!leadId) {
       return NextResponse.json({ error: 'Lead ID required' }, { status: 400 });
     }
@@ -330,6 +357,12 @@ export async function PATCH(request) {
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
     if (priority !== undefined) updateData.priority = priority;
+    if (lead_status !== undefined) updateData.lead_status = lead_status;
+    if (deal_amount !== undefined) updateData.deal_amount = Number(deal_amount) || 0;
+    if (follow_up_time !== undefined) updateData.follow_up_time = follow_up_time ? new Date(follow_up_time) : null;
+    if (join_as !== undefined) updateData.join_as = String(join_as).trim();
+    if (start_timeline !== undefined) updateData.start_timeline = String(start_timeline).trim();
+    if (call_attempts !== undefined) updateData.call_attempts = Number(call_attempts) || 0;
 
     const updatedLead = await Lead.findByIdAndUpdate(
       leadId,

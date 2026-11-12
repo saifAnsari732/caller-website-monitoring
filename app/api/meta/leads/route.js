@@ -5,6 +5,7 @@ import User from '../../../../lib/models/User';
 import { getOrInitSettings } from '../../../../lib/settings';
 import { purgeDashboardCache, purgeMetaCache } from '../../../../lib/cache';
 import { parseMetaLeadItem, sanitizePhone } from '../../../../lib/metaLeadParser';
+import { requireAdminApi } from '../../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -180,6 +181,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const adminPayload = await requireAdminApi(request);
     await connectDB();
     const body = await request.json();
     const settings = await getOrInitSettings();
@@ -271,6 +273,7 @@ export async function POST(request) {
       if (leadData.inbox_url) noteParts.push(`Inbox: ${leadData.inbox_url}`);
 
       const created = await Lead.create({
+        admin_id: adminPayload?.id || null,
         name: (leadData.full_name || leadData.name || '').trim() || `Meta Lead ${leadData.id || ''}`.trim(),
         mobile: phoneToStore,
         email: (leadData.email || '').trim(),
@@ -370,6 +373,7 @@ export async function POST(request) {
               : null;
 
             const created = await Lead.create({
+              admin_id: adminPayload?.id || null,
               name: parsed.name || `Meta Lead ${parsed.metaLeadId}`,
               mobile: phoneToStore,
               email: parsed.email,
