@@ -22,9 +22,8 @@ export async function POST(request) {
     const rawMobile = String(body.mobile || '').replace(/\D/g, '').slice(-10);
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
-    const requestedRole = body.role === 'admin' ? 'admin' : 'telecaller';
-    const team = String(body.team || body.department || (requestedRole === 'admin' ? 'Operations HQ' : 'North Region Sales')).trim();
-    const adminCode = String(body.adminCode || '').trim();
+    const requestedRole = body.role === 'telecaller' ? 'telecaller' : 'admin';
+    const team = String(body.team || (requestedRole === 'admin' ? 'Operations HQ' : 'North Region Sales')).trim();
 
     if (!name || name.length < 2) {
       return NextResponse.json({ error: 'Please enter a valid full name.' }, { status: 400 });
@@ -41,16 +40,6 @@ export async function POST(request) {
     const pwdCheck = validatePasswordStrength(password);
     if (!pwdCheck.valid) {
       return NextResponse.json({ error: pwdCheck.message }, { status: 400 });
-    }
-
-    if (requestedRole === 'admin') {
-      const expectedCode = process.env.ADMIN_INVITE_CODE || 'KISAN-ADMIN-2026';
-      if (adminCode !== expectedCode) {
-        return NextResponse.json(
-          { error: 'Invalid Admin Authorization Key. Contact HQ IT to register an Administrator.' },
-          { status: 403 }
-        );
-      }
     }
 
     const existing = await User.findOne({
