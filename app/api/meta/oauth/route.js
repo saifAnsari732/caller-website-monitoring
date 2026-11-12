@@ -24,9 +24,10 @@ export async function GET(request) {
     }
 
     const responseType = process.env.META_APP_SECRET ? 'code' : 'token';
+    const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_ads,leads_retrieval';
     const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${DEFAULT_APP_ID}&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}&scope=pages_show_list,pages_read_engagement,pages_manage_ads,pages_manage_metadata,leads_retrieval,ads_management,ads_read,business_management&response_type=${responseType}&state=kisan_meta_oauth_${Date.now()}`;
+    )}&scope=${encodeURIComponent(scopes)}&response_type=${responseType}&state=kisan_meta_oauth_${Date.now()}`;
 
     if (action === 'popup' || action === 'authorize') {
       return NextResponse.redirect(authUrl);

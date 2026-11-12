@@ -153,9 +153,10 @@ export default function SettingsPage() {
       redirectUri = 'https://caller-website-monitoring.vercel.app/api/meta/oauth/callback';
     }
     const appId = status?.appId || '1007200718473332';
+    const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_ads,leads_retrieval';
     const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}&scope=pages_show_list,pages_read_engagement,pages_manage_ads,pages_manage_metadata,leads_retrieval,ads_management,ads_read&response_type=code&state=kisan_meta_oauth_${Date.now()}`;
+    )}&scope=${encodeURIComponent(scopes)}&response_type=token,code&state=kisan_meta_oauth_${Date.now()}`;
 
     const width = 640;
     const height = 720;
@@ -198,6 +199,36 @@ export default function SettingsPage() {
       showToast('Error syncing forms.');
     } finally {
       setSyncingAll(false);
+    }
+  };
+
+  // Direct Token Connect (System User or Page Access Token - Bypasses Facebook Dialog)
+  const handleSaveCustomToken = async (e) => {
+    e.preventDefault();
+    if (!customToken || customToken.trim().length < 15) {
+      showToast('Please enter a valid Meta Page Access Token (starts with EAA...)');
+      return;
+    }
+    setSavingFb(true);
+    try {
+      const res = await fetch('/api/meta/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: customToken.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Meta connected successfully! ${data.message || ''}`);
+        setShowTokenInput(false);
+        setCustomToken('');
+        fetchStatus();
+      } else {
+        showToast(data.error || 'Failed to connect token');
+      }
+    } catch (err) {
+      showToast(err.message || 'Connection failed');
+    } finally {
+      setSavingFb(false);
     }
   };
 
@@ -511,9 +542,49 @@ export default function SettingsPage() {
                 className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <KeyRound size={14} className="text-slate-500" />
-                <span>Token</span>
+                <span>Paste Token Directly</span>
               </button>
             </div>
+
+            {/* Direct Token Input Drawer (Bypasses Facebook Login Popup) */}
+            {showTokenInput && (
+              <form onSubmit={handleSaveCustomToken} className="mt-4 p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-3 animate-in fade-in slide-in-from-top-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <KeyRound size={16} className="text-blue-600" />
+                    <span className="text-xs font-bold text-slate-900">Direct Meta Page Access Token (Never Expires)</span>
+                  </div>
+                  <span className="text-[11px] text-blue-700 font-medium">Bypasses Facebook OAuth Dialog</span>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  Generate from <strong>Meta Business Suite &gt; System Users</strong> or <strong>Graph API Explorer</strong> with <code>leads_retrieval</code> and <code>pages_manage_ads</code> scopes.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    value={customToken}
+                    onChange={(e) => setCustomToken(e.target.value)}
+                    placeholder="EAABw..."
+                    className="flex-1 px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <button
+                    type="submit"
+                    disabled={savingFb}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                  >
+                    {savingFb ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                    <span>{savingFb ? 'Validating...' : 'Connect Token'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowTokenInput(false)}
+                    className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
 
           {/* KPI Cards */}
