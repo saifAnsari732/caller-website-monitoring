@@ -319,8 +319,8 @@ export default function MetaLeadsPage() {
           ) : leads.length === 0 ? (
             <div className="p-14 text-center text-slate-400">
               <Zap size={32} className="mx-auto mb-3 text-slate-300" />
-              <p className="text-sm font-semibold text-slate-600">No Meta leads match the filter</p>
-              <p className="text-xs mt-1">Click &ldquo;Sync Form Leads&rdquo; or &ldquo;Test Meta Lead Capture&rdquo; in the header to ingest leads.</p>
+              <p className="text-sm font-semibold text-slate-600">No Meta leads in queue</p>
+              <p className="text-xs mt-1">Live webhook stream is ready. Incoming Facebook &amp; Instagram leads will appear here instantly.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">

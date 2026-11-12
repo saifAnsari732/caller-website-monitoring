@@ -33,7 +33,7 @@ async function pickCallerForForm(activeCallers, formConfig, globalStrategy) {
         caller: c,
         open: await Lead.countDocuments({
           assigned_to: c._id,
-          status: { $in: ['Fresh Lead', 'Assigned', 'Follow Up', 'Callback'] }
+          status: { $in: ['Fresh Lead', 'Assigned', 'In-Progress', 'Follow Up', 'Callback'] }
         })
       }))
     );
@@ -41,13 +41,16 @@ async function pickCallerForForm(activeCallers, formConfig, globalStrategy) {
     return counts[0].caller;
   }
 
-  const lastLead = await Lead.findOne({ assigned_to: { $in: pool.map(p => p._id) } })
-    .sort({ assigned_at: -1 })
-    .lean();
-  const lastIdx = lastLead?.assigned_to
-    ? pool.findIndex(c => c._id.toString() === lastLead.assigned_to.toString())
-    : -1;
-  return pool[(lastIdx + 1) % pool.length];
+  // Atomic round-robin counter prevents race-condition collisions during concurrent lead bursts
+  const CounterModel = (await import('../../../../lib/models/Counter.js')).default;
+  const poolKey = `rr_${formConfig?.formId || formConfig?.assignedTeam || 'global'}`;
+  const counter = await CounterModel.findOneAndUpdate(
+    { _id: poolKey },
+    { $inc: { seq: 1 } },
+    { returnDocument: 'after', upsert: true }
+  );
+  const callerIdx = Math.abs((counter?.seq || 0) % pool.length);
+  return pool[callerIdx];
 }
 
 export async function GET(request) {
@@ -249,11 +252,16 @@ export async function POST(request) {
       const tags = isPhoneValid ? [] : ['Urgent'];
 
       let existing = null;
-      if (isPhoneValid) {
-        existing = await Lead.findOne({ mobile: cleanMobile });
+      if (leadData.id) {
+        existing = await Lead.findOne({
+          $or: [
+            { meta_lead_id: String(leadData.id) },
+            { notes: { $regex: String(leadData.id) } }
+          ]
+        });
       }
-      if (!existing && leadData.id) {
-        existing = await Lead.findOne({ notes: { $regex: String(leadData.id) } });
+      if (!existing && isPhoneValid) {
+        existing = await Lead.findOne({ mobile: cleanMobile });
       }
 
       if (existing) {
@@ -281,9 +289,14 @@ export async function POST(request) {
         state: (leadData.state || '').trim(),
         business_type: (leadData.business_type || leadData.custom_question_1 || '').trim(),
         product_interest: (leadData.product_interest || leadData.custom_question_2 || '').trim(),
+        join_as: (leadData.join_as || leadData.business_type || leadData.custom_question_1 || '').trim(),
+        start_timeline: (leadData.start_timeline || leadData.product_interest || leadData.custom_question_2 || '').trim(),
+        meta_lead_id: String(leadData.id || ''),
+        meta_form_id: String(formId || ''),
         lead_source: 'Facebook Meta Lead Ads',
         campaign_name: campaignName,
-        status: chosenCaller ? 'Assigned' : 'Fresh Lead',
+        status: chosenCaller ? 'Assigned' : 'Fresh Inquiry',
+        lead_status: 'In-Progress',
         assigned_to: chosenCaller ? chosenCaller._id : null,
         assigned_at: chosenCaller ? new Date() : null,
         tags,
@@ -360,11 +373,16 @@ export async function POST(request) {
             if (!phoneToStore) continue;
 
             let existing = null;
-            if (isPhoneValid) {
-              existing = await Lead.findOne({ mobile: parsed.mobile });
+            if (parsed.metaLeadId) {
+              existing = await Lead.findOne({
+                $or: [
+                  { meta_lead_id: parsed.metaLeadId },
+                  { notes: { $regex: parsed.metaLeadId } }
+                ]
+              });
             }
-            if (!existing && parsed.metaLeadId) {
-              existing = await Lead.findOne({ notes: { $regex: parsed.metaLeadId } });
+            if (!existing && isPhoneValid) {
+              existing = await Lead.findOne({ mobile: parsed.mobile });
             }
             if (existing) continue;
 
@@ -381,9 +399,14 @@ export async function POST(request) {
               state: parsed.state,
               business_type: parsed.businessType,
               product_interest: parsed.productInterest,
+              join_as: parsed.join_as || parsed.businessType || '',
+              start_timeline: parsed.start_timeline || parsed.productInterest || '',
+              meta_lead_id: parsed.metaLeadId || '',
+              meta_form_id: fCfg.formId || '',
               lead_source: 'Facebook Meta Lead Ads',
               campaign_name: parsed.campaignName || fCfg.campaignName || fCfg.formName || '',
-              status: chosenCaller ? 'Assigned' : 'Fresh Lead',
+              status: chosenCaller ? 'Assigned' : 'Fresh Inquiry',
+              lead_status: 'In-Progress',
               assigned_to: chosenCaller ? chosenCaller._id : null,
               assigned_at: chosenCaller ? new Date() : null,
               tags: isPhoneValid ? [] : ['Urgent'],
