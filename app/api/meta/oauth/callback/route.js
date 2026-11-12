@@ -74,19 +74,76 @@ export async function GET(request) {
           } catch {}
 
           const pagesRes = await fetch(
-            `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token&access_token=${encodeURIComponent(userToken)}`,
+            `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,category&access_token=${encodeURIComponent(userToken)}`,
             { cache: 'no-store' }
           );
           const pagesJson = await pagesRes.json();
+          let connectedPages = [];
           if (Array.isArray(pagesJson?.data) && pagesJson.data.length > 0) {
-            const chosen = pagesJson.data.find(p => p.id === pageId) || pagesJson.data[0];
+            connectedPages = pagesJson.data.map(p => ({
+              id: String(p.id),
+              name: p.name,
+              category: p.category || '',
+              accessToken: p.access_token || userToken
+            }));
+            const chosen = connectedPages[0];
             pageId = chosen.id;
             pageName = chosen.name;
-            activeToken = chosen.access_token || userToken;
+            activeToken = chosen.accessToken;
           } else {
             activeToken = userToken;
+            connectedPages = [{ id: pageId, name: pageName, accessToken: userToken }];
           }
+
+          let connectedAdAccounts = [];
+          let userAdAccountId = process.env.META_AD_ACCOUNT_ID || 'act_1796071777698019';
+          try {
+            const adAccRes = await fetch(
+              `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,account_id,name,currency&access_token=${encodeURIComponent(userToken)}`,
+              { cache: 'no-store' }
+            );
+            const adAccData = await adAccRes.json();
+            if (Array.isArray(adAccData?.data) && adAccData.data.length > 0) {
+              connectedAdAccounts = adAccData.data.map(a => ({
+                id: a.id,
+                accountId: a.account_id,
+                name: a.name || `Ad Account ${a.account_id}`,
+                currency: a.currency || 'INR'
+              }));
+              userAdAccountId = connectedAdAccounts[0].id;
+            }
+          } catch {}
+
+          // Subscribe the newly connected page to webhook leadgen events
+          try {
+            await fetch(
+              `https://graph.facebook.com/v21.0/${pageId}/subscribed_apps?access_token=${encodeURIComponent(activeToken)}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscribed_fields: ['leadgen'] })
+              }
+            );
+          } catch {}
+
           exchangedServerSide = true;
+          settings.metaConfig = {
+            connected: true,
+            appId,
+            pageId,
+            pageName,
+            adAccountId: userAdAccountId,
+            accessToken: activeToken,
+            userAccessToken: userToken,
+            connectedPages,
+            connectedAdAccounts,
+            verifyToken: process.env.META_VERIFY_TOKEN || settings.metaConfig?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY',
+            webhookSubscribed: true,
+            autoSyncEnabled: true,
+            zeroLossFallback: true,
+            connectedAt: new Date(),
+            lastSyncAt: new Date()
+          };
         }
       } catch (exchangeErr) {
         console.warn('OAuth code exchange warning:', exchangeErr.message);
@@ -94,21 +151,6 @@ export async function GET(request) {
 
       if (exchangedServerSide && activeToken) {
         const liveForms = await fetchLiveMetaFormsFromGraph(pageId, pageName, activeToken);
-        settings.metaConfig = {
-          connected: true,
-          appId,
-          pageId,
-          pageName,
-          adAccountId: process.env.META_AD_ACCOUNT_ID || 'act_1796071777698019',
-          accessToken: activeToken,
-          userAccessToken: userToken,
-          verifyToken: process.env.META_VERIFY_TOKEN || settings.metaConfig?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY',
-          webhookSubscribed: true,
-          autoSyncEnabled: true,
-          zeroLossFallback: true,
-          connectedAt: new Date(),
-          lastSyncAt: new Date()
-        };
         if (liveForms.length > 0) {
           settings.metaForms = liveForms;
           settings.markModified('metaForms');

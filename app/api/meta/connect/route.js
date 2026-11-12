@@ -294,10 +294,16 @@ export async function POST(request) {
     }
 
     if (!token || token.trim().length < 10) {
-      return NextResponse.json({ error: 'Invalid token. Please paste a valid Page Access Token.' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid token. Please paste a valid Meta Page or User Access Token.' }, { status: 400 });
     }
 
-    const meRes = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${encodeURIComponent(token.trim())}`, { cache: 'no-store' });
+    const cleanToken = token.trim();
+
+    // 1. Inspect Token and Resolve Connected Accounts / Pages
+    const meRes = await fetch(
+      `https://graph.facebook.com/v21.0/me?fields=id,name,category,accounts{id,name,access_token,category}&access_token=${encodeURIComponent(cleanToken)}`,
+      { cache: 'no-store' }
+    );
     const meData = await meRes.json();
 
     if (meData.error) {
@@ -307,14 +313,63 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const pageId = meData.id || process.env.META_PAGE_ID || '933429549844450';
-    const pageName = meData.name || process.env.META_PAGE_NAME || 'Kisan Choice';
+    let targetPageId = '';
+    let targetPageName = '';
+    let targetPageToken = cleanToken;
+    let connectedPages = [];
+    let connectedAdAccounts = [];
 
+    if (Array.isArray(meData.accounts?.data) && meData.accounts.data.length > 0) {
+      // User or System User token managing one or more pages
+      connectedPages = meData.accounts.data.map(p => ({
+        id: String(p.id),
+        name: p.name,
+        category: p.category || '',
+        accessToken: p.access_token || cleanToken
+      }));
+      const chosen = (customPageId ? connectedPages.find(p => p.id === customPageId) : null) || connectedPages[0];
+      targetPageId = chosen.id;
+      targetPageName = chosen.name;
+      targetPageToken = chosen.accessToken;
+    } else {
+      // Direct Page Access Token
+      targetPageId = String(meData.id);
+      targetPageName = meData.name || 'Meta Page';
+      connectedPages = [{
+        id: targetPageId,
+        name: targetPageName,
+        category: meData.category || '',
+        accessToken: cleanToken
+      }];
+    }
+
+    // 2. Fetch associated Ad Accounts if available
+    try {
+      const adAccRes = await fetch(
+        `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,account_id,name,currency,account_status&access_token=${encodeURIComponent(cleanToken)}`,
+        { cache: 'no-store' }
+      );
+      const adAccData = await adAccRes.json();
+      if (Array.isArray(adAccData?.data)) {
+        connectedAdAccounts = adAccData.data.map(a => ({
+          id: a.id,
+          accountId: a.account_id,
+          name: a.name || `Ad Account ${a.account_id}`,
+          currency: a.currency || 'INR'
+        }));
+      }
+    } catch (e) {
+      console.warn('Ad account discovery warning:', e.message);
+    }
+
+    const targetAdAccountId = connectedAdAccounts[0]?.id || settings.metaConfig?.adAccountId || 'act_1796071777698019';
+
+    // 3. Subscribe newly connected page to leadgen events
     let subscribed = false;
     let subscribeMessage = '';
     try {
       const subRes = await fetch(
-        `https://graph.facebook.com/v21.0/${pageId}/subscribed_apps?access_token=${encodeURIComponent(token.trim())}`,
+        `https://graph.facebook.com/v21.0/${targetPageId}/subscribed_apps?access_token=${encodeURIComponent(targetPageToken)}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -328,27 +383,117 @@ export async function POST(request) {
       subscribeMessage = 'Failed to subscribe: ' + subErr.message;
     }
 
+    // 4. Fetch all real lead generation forms for the connected page
+    let realForms = [];
+    try {
+      const formsRes = await fetch(
+        `https://graph.facebook.com/v21.0/${targetPageId}/leadgen_forms?fields=id,name,status,leads_count,questions&limit=100&access_token=${encodeURIComponent(targetPageToken)}`,
+        { cache: 'no-store' }
+      );
+      const formsData = await formsRes.json();
+      if (Array.isArray(formsData?.data)) {
+        realForms = formsData.data.map(f => ({
+          formId: String(f.id),
+          formName: f.name || `Lead Form ${f.id}`,
+          pageName: targetPageName,
+          platform: 'Facebook & Instagram Lead Ads',
+          campaignAction: 'existing',
+          campaignName: f.name || '',
+          distributionRule: 'ROUND_ROBIN',
+          assignedTeam: 'North Region Sales',
+          assignedCallerId: '',
+          assignedCallerName: 'Auto Round-Robin',
+          customizeFields: true,
+          fieldMapping: {},
+          active: f.status === 'ACTIVE',
+          leadsCaptured: Number(f.leads_count) || 0,
+          lastLeadAt: null
+        }));
+      }
+    } catch (fErr) {
+      console.warn('Could not fetch real forms for page:', fErr.message);
+    }
+
+    // 5. Fetch real campaigns for connected ad account
+    let realCampaigns = [];
+    if (targetAdAccountId) {
+      try {
+        const campRes = await fetch(
+          `https://graph.facebook.com/v21.0/${targetAdAccountId}/campaigns?fields=id,name,status,objective,daily_budget,insights{impressions,clicks,spend}&limit=50&access_token=${encodeURIComponent(cleanToken)}`,
+          { cache: 'no-store' }
+        );
+        const campData = await campRes.json();
+        if (Array.isArray(campData?.data)) {
+          realCampaigns = campData.data.map(c => {
+            const ins = c.insights?.data?.[0] || {};
+            return {
+              campaignId: String(c.id),
+              name: c.name,
+              status: c.status || 'PAUSED',
+              objective: c.objective || 'OUTCOME_LEADS',
+              dailyBudget: c.daily_budget ? Math.round(Number(c.daily_budget) / 100) : 0,
+              spend: ins.spend ? Number(ins.spend) : 0,
+              impressions: ins.impressions ? Number(ins.impressions) : 0,
+              clicks: ins.clicks ? Number(ins.clicks) : 0,
+              leadsCount: 0,
+              assignedTeam: 'North Region Sales',
+              distributionRule: 'ROUND_ROBIN',
+              linkedFormId: realForms[0]?.formId || '',
+              linkedFormName: realForms[0]?.formName || '',
+              lastSyncAt: new Date()
+            };
+          });
+        }
+      } catch (cErr) {
+        console.warn('Could not fetch real campaigns:', cErr.message);
+      }
+    }
+
+    // 6. Save completely to MongoDB - Real Connected Account Data Only
     settings.metaConfig = {
       ...(settings.metaConfig?.toObject?.() || settings.metaConfig),
       connected: true,
-      pageId,
-      pageName,
-      accessToken: token.trim(),
+      pageId: targetPageId,
+      pageName: targetPageName,
+      adAccountId: targetAdAccountId,
+      accessToken: targetPageToken,
+      userAccessToken: cleanToken,
+      connectedPages,
+      connectedAdAccounts,
       webhookSubscribed: subscribed,
+      autoSyncEnabled: true,
+      zeroLossFallback: true,
       connectedAt: new Date(),
       lastSyncAt: new Date()
     };
+
+    if (realForms.length > 0) {
+      settings.metaForms = realForms;
+      settings.markModified('metaForms');
+    }
+
+    if (realCampaigns.length > 0) {
+      settings.metaCampaigns = realCampaigns;
+      settings.markModified('metaCampaigns');
+    }
+
     settings.connectedIntegrations = [];
+    settings.markModified('metaConfig');
+    settings.markModified('connectedIntegrations');
     await settings.save();
 
+    // 7. Update .env.local if present
     try {
       const envPath = path.join(process.cwd(), '.env.local');
       if (fs.existsSync(envPath)) {
         let envContent = fs.readFileSync(envPath, 'utf-8');
+        envContent = envContent.replace(/META_PAGE_ID=.*/g, `META_PAGE_ID=${targetPageId}`);
+        envContent = envContent.replace(/META_PAGE_NAME=.*/g, `META_PAGE_NAME=${targetPageName}`);
+        envContent = envContent.replace(/META_AD_ACCOUNT_ID=.*/g, `META_AD_ACCOUNT_ID=${targetAdAccountId}`);
         if (envContent.includes('META_PAGE_ACCESS_TOKEN=')) {
-          envContent = envContent.replace(/META_PAGE_ACCESS_TOKEN=.*/g, `META_PAGE_ACCESS_TOKEN=${token.trim()}`);
+          envContent = envContent.replace(/META_PAGE_ACCESS_TOKEN=.*/g, `META_PAGE_ACCESS_TOKEN=${targetPageToken}`);
         } else {
-          envContent += `\nMETA_PAGE_ACCESS_TOKEN=${token.trim()}`;
+          envContent += `\nMETA_PAGE_ACCESS_TOKEN=${targetPageToken}`;
         }
         fs.writeFileSync(envPath, envContent, 'utf-8');
       }
@@ -359,11 +504,17 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      pageId,
-      pageName,
+      pageId: targetPageId,
+      pageName: targetPageName,
+      adAccountId: targetAdAccountId,
+      pagesFound: connectedPages.length,
+      connectedPages,
+      connectedAdAccounts,
+      formsSynced: realForms.length,
+      campaignsSynced: realCampaigns.length,
       subscribed,
       subscribeMessage,
-      message: `Connected to "${pageName}" (${pageId}).`
+      message: `Successfully connected Meta Account: "${targetPageName}" (${targetPageId}). Synced ${realForms.length} real forms and ${realCampaigns.length} campaigns.`
     });
   } catch (error) {
     console.error('Meta connect error:', error);

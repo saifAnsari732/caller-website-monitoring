@@ -339,14 +339,18 @@ export async function POST(request) {
       });
     }
 
-    if (body.action === 'SYNC_FORM_LEADS') {
-      const { formId, count = 15 } = body;
+    if (
+      body.action === 'SYNC_FORM_LEADS' ||
+      body.action === 'SYNC_ALL_ACTIVE_FORMS' ||
+      body.action === 'SYNC_SINGLE_FORM'
+    ) {
+      const { formId, count = 15, countPerForm } = body;
       const token = settings.metaConfig?.accessToken || process.env.META_PAGE_ACCESS_TOKEN || '';
       if (!token || token.trim().length < 15) {
         return NextResponse.json({ error: 'Meta Page Access Token is not configured.' }, { status: 400 });
       }
 
-      const numToSync = Math.min(50, Math.max(1, Number(count) || 15));
+      const numToSync = Math.min(50, Math.max(1, Number(countPerForm || count) || 15));
       const autoSyncAllowed = settings.metaConfig?.autoSyncEnabled ?? true;
 
       let formsToSync = [];

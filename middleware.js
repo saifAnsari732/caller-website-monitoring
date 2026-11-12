@@ -17,11 +17,12 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
-  // 2. Allow unauthenticated auth APIs and webhooks
+  // 2. Allow unauthenticated auth APIs, OAuth callbacks, and webhooks
   if (
     pathname.startsWith('/api/auth/login') ||
     pathname.startsWith('/api/auth/register') ||
     pathname.startsWith('/api/auth/reset-password') ||
+    pathname.startsWith('/api/meta/oauth') ||
     pathname.startsWith('/api/webhooks')
   ) {
     return NextResponse.next();

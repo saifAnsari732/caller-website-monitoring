@@ -93,8 +93,9 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const settings = await getOrInitSettings();
     const token =
-      process.env.META_PAGE_ACCESS_TOKEN ||
       settings.metaConfig?.accessToken ||
+      process.env.META_PAGE_ACCESS_TOKEN ||
+      settings.metaConfig?.userAccessToken ||
       process.env.META_USER_ACCESS_TOKEN ||
       '';
 
@@ -106,6 +107,7 @@ export async function POST(request) {
         for (const change of (entry.changes || [])) {
           if (change?.value) {
             incomingItems.push({
+              pageId: String(entry.id || ''),
               formId: String(change.value.form_id || ''),
               metaLeadId: String(change.value.leadgen_id || ''),
               field_data: change.value.field_data || null,
@@ -170,17 +172,35 @@ export async function POST(request) {
 
       const matchedForm = (settings.metaForms || []).find(f => f.formId === extracted.formId);
 
+      // Determine the best token for this specific page if multi-account is present
+      const pageMatch = Array.isArray(settings.metaConfig?.connectedPages)
+        ? settings.metaConfig.connectedPages.find(p => p.id === rawItem.pageId)
+        : null;
+      const activeToken = pageMatch?.accessToken || token;
+
       // Fetch from Meta Graph API if leadgen_id exists and token is active
       let parsedFromGraph = false;
-      if (extracted.metaLeadId && token && token.length > 15) {
+      if (extracted.metaLeadId && activeToken && activeToken.length > 15) {
         try {
           const leadRes = await fetch(
-            `https://graph.facebook.com/v21.0/${extracted.metaLeadId}?fields=id,created_time,ad_name,campaign_name,form_id,field_data&access_token=${encodeURIComponent(token.trim())}`,
+            `https://graph.facebook.com/v21.0/${extracted.metaLeadId}?fields=id,created_time,ad_name,campaign_name,form_id,field_data&access_token=${encodeURIComponent(activeToken.trim())}`,
             { cache: 'no-store' }
           );
           const leadData = await leadRes.json();
           if (leadData && !leadData.error) {
-            const parsed = parseMetaLeadItem(leadData, matchedForm?.formName || '');
+            let formName = matchedForm?.formName || '';
+            if (!formName && extracted.formId) {
+              try {
+                const fnRes = await fetch(
+                  `https://graph.facebook.com/v21.0/${extracted.formId}?fields=name&access_token=${encodeURIComponent(activeToken.trim())}`,
+                  { cache: 'no-store' }
+                );
+                const fnData = await fnRes.json();
+                if (fnData?.name) formName = fnData.name;
+              } catch {}
+            }
+
+            const parsed = parseMetaLeadItem(leadData, formName);
             extracted.name = parsed.name || extracted.name;
             extracted.mobile = parsed.mobile || parsed.rawMobile || extracted.mobile;
             extracted.email = parsed.email || extracted.email;
@@ -188,7 +208,7 @@ export async function POST(request) {
             extracted.state = parsed.state || extracted.state;
             extracted.business_type = parsed.businessType || extracted.business_type;
             extracted.product_interest = parsed.productInterest || extracted.product_interest;
-            extracted.campaign_name = parsed.campaignName || extracted.campaign_name;
+            extracted.campaign_name = parsed.campaignName || formName || extracted.campaign_name;
             extracted.join_as = parsed.join_as || parsed.businessType || '';
             extracted.start_timeline = parsed.start_timeline || parsed.productInterest || '';
             extracted.notes = parsed.notes || extracted.notes;
