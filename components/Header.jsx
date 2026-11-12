@@ -11,7 +11,9 @@ import {
   Menu,
   ShieldCheck,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -26,7 +28,7 @@ function getInitials(name = 'AD') {
 
 export default function Header({ title, subtitle }) {
   const router = useRouter();
-  const { user, setMobileSidebarOpen, logout } = useAuth();
+  const { user, sidebarCollapsed, toggleSidebarCollapsed, setMobileSidebarOpen, logout } = useAuth();
 
   const [syncing, setSyncing] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
@@ -90,13 +92,29 @@ export default function Header({ title, subtitle }) {
   return (
     <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/85 px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between sticky top-0 z-20 gap-4">
       <div className="flex items-center gap-3 min-w-0">
+        {/* Mobile menu trigger */}
         <button
           type="button"
           onClick={() => setMobileSidebarOpen(true)}
-          className="lg:hidden p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shrink-0"
+          className="lg:hidden p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shrink-0 cursor-pointer"
           aria-label="Open navigation menu"
         >
           <Menu size={18} strokeWidth={1.9} aria-hidden="true" />
+        </button>
+
+        {/* Desktop sidebar collapse / expand button */}
+        <button
+          type="button"
+          onClick={toggleSidebarCollapsed}
+          className="hidden lg:inline-flex p-2 rounded-xl border border-slate-200/80 bg-slate-50/80 hover:bg-blue-50 text-slate-600 hover:text-blue-700 hover:border-blue-200 shadow-2xs transition-all shrink-0 cursor-pointer"
+          aria-label={sidebarCollapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'}
+          title={sidebarCollapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'}
+        >
+          {sidebarCollapsed ? (
+            <PanelLeftOpen size={18} strokeWidth={1.9} aria-hidden="true" />
+          ) : (
+            <PanelLeftClose size={18} strokeWidth={1.9} aria-hidden="true" />
+          )}
         </button>
 
         <div className="min-w-0">

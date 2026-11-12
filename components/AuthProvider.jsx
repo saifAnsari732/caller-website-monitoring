@@ -49,6 +49,25 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
+  // Global keyboard shortcut (Ctrl+B / Cmd+B) to collapse / expand sidebar
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b' && !e.shiftKey && !e.altKey) {
+        const target = e.target;
+        const isInput =
+          target?.tagName === 'INPUT' ||
+          target?.tagName === 'TEXTAREA' ||
+          target?.isContentEditable;
+        if (!isInput) {
+          e.preventDefault();
+          toggleSidebarCollapsed();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleSidebarCollapsed]);
+
   const refreshUser = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/me', { cache: 'no-store' });

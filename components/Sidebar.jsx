@@ -93,81 +93,80 @@ export default function Sidebar() {
   const [adminOpen, setAdminOpen] = useState(true);
 
   const renderSidebarBody = (isCollapsedView = false) => (
-    <div className="flex flex-col h-full bg-white text-slate-800 border-r border-slate-200/90 select-none">
+    <div className="flex flex-col h-full bg-white text-slate-800 border-r border-slate-200/90 shadow-[4px_0_24px_rgba(15,23,42,0.02)] select-none">
       {/* Brand Header */}
       <div
         className={`h-16 px-4 border-b border-slate-200/80 flex items-center ${
-          isCollapsedView ? 'justify-center' : 'justify-between'
-        } shrink-0`}
+          isCollapsedView ? 'justify-center px-2' : 'justify-between'
+        } shrink-0 bg-white`}
       >
-        <Link
-          href="/"
-          className="flex items-center gap-3 min-w-0 group focus-visible:outline-none"
-          title="Kisan India Pvt. Ltd. — Admin Console"
-        >
-          <div className="w-9 h-9 rounded-xl bg-[#1E40AF] text-white flex items-center justify-center shrink-0 shadow-xs group-hover:bg-blue-700 transition-colors">
-            <Building2 size={18} strokeWidth={2} aria-hidden="true" />
-          </div>
-          {!isCollapsedView && (
-            <div className="min-w-0">
-              <p className="font-heading text-[13.5px] font-bold text-slate-900 truncate leading-tight">
-                Kisan India CRM
-              </p>
-              <p className="text-[11.5px] text-slate-500 font-medium truncate leading-tight mt-0.5">
-                Admin Monitoring Hub
-              </p>
-            </div>
-          )}
-        </Link>
+        {!isCollapsedView ? (
+          <>
+            <Link
+              href="/"
+              className="flex items-center gap-3 min-w-0 group focus-visible:outline-none"
+              title="Kisan India Pvt. Ltd. — Admin Console"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-600/30 border border-blue-500/20 group-hover:scale-105 transition-all">
+                <Building2 size={19} strokeWidth={2.2} aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-heading text-sm font-bold text-slate-900 truncate leading-tight group-hover:text-blue-700 transition-colors">
+                  Kisan India CRM
+                </p>
+                <p className="text-[11px] text-slate-500 font-semibold truncate leading-tight mt-0.5">
+                  Admin Monitoring Hub
+                </p>
+              </div>
+            </Link>
 
-        {!isCollapsedView && (
+            <button
+              type="button"
+              onClick={toggleSidebarCollapsed}
+              className="hidden lg:inline-flex p-2 rounded-xl border border-slate-200/90 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-700 hover:border-blue-200 transition-all shadow-2xs cursor-pointer group"
+              aria-label="Collapse sidebar (Ctrl+B)"
+              title="Collapse sidebar (Ctrl+B)"
+            >
+              <PanelLeftClose size={17} strokeWidth={2} className="group-hover:scale-110 transition-transform" aria-hidden="true" />
+            </button>
+          </>
+        ) : (
           <button
             type="button"
             onClick={toggleSidebarCollapsed}
-            className="hidden lg:inline-flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-            aria-label="Collapse sidebar"
-            title="Collapse sidebar"
+            className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-md shadow-blue-600/30 hover:shadow-lg hover:scale-105 transition-all group cursor-pointer border border-blue-400/30"
+            aria-label="Expand sidebar (Ctrl+B)"
+            title="Expand sidebar (Ctrl+B)"
           >
-            <PanelLeftClose size={17} strokeWidth={1.85} aria-hidden="true" />
+            <PanelLeftOpen size={19} strokeWidth={2.2} className="group-hover:scale-110 transition-transform" aria-hidden="true" />
           </button>
         )}
 
+        {/* Mobile drawer close button */}
         <button
           type="button"
           onClick={() => setMobileSidebarOpen(false)}
-          className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+          className="lg:hidden p-2 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
           aria-label="Close navigation menu"
         >
-          <X size={18} aria-hidden="true" />
+          <X size={18} strokeWidth={2} aria-hidden="true" />
         </button>
       </div>
-
-      {isCollapsedView && (
-        <div className="px-3 pt-3 pb-1 flex justify-center">
-          <button
-            type="button"
-            onClick={toggleSidebarCollapsed}
-            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-            aria-label="Expand sidebar"
-            title="Expand sidebar"
-          >
-            <PanelLeftOpen size={18} strokeWidth={1.85} aria-hidden="true" />
-          </button>
-        </div>
-      )}
 
       {/* Navigation Links */}
       <nav
         aria-label="Main CRM Navigation"
-        className="flex-1 overflow-y-auto px-3 py-4 space-y-5"
+        className="flex-1 overflow-y-auto px-2.5 sm:px-3 py-3.5 space-y-3.5"
       >
-        {NAVIGATION_SECTIONS.map((section) => (
+        {NAVIGATION_SECTIONS.map((section, idx) => (
           <div key={section.id} className="space-y-1">
-            {!isCollapsedView && (
-              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+            {!isCollapsedView ? (
+              <div className="px-3 pt-1 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
                 {section.label}
               </div>
-            )}
+            ) : idx > 0 ? (
+              <div className="h-px bg-slate-200/80 my-2 mx-1" />
+            ) : null}
 
             {section.items.map((item) => {
               const Icon = item.icon;
@@ -183,40 +182,43 @@ export default function Sidebar() {
                   title={isCollapsedView ? item.name : undefined}
                   aria-current={isActive ? 'page' : undefined}
                   className={`relative flex items-center ${
-                    isCollapsedView ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2'
-                  } rounded-xl text-[13.5px] leading-5 transition-colors duration-150 group ${
+                    isCollapsedView
+                      ? 'justify-center p-2.5'
+                      : 'justify-between px-3 py-2'
+                  } rounded-xl text-[13.5px] leading-5 transition-all duration-150 group cursor-pointer ${
                     isActive
-                      ? 'bg-blue-50/90 text-blue-700 font-semibold'
-                      : 'text-slate-600 font-medium hover:bg-slate-100/80 hover:text-slate-900'
+                      ? isCollapsedView
+                        ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white font-bold shadow-md shadow-blue-600/30 border border-blue-400/30'
+                        : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white font-bold shadow-md shadow-blue-600/25 border border-blue-500/30'
+                      : 'text-slate-700 font-semibold hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
-                  {isActive && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-blue-600"
-                    />
-                  )}
-
-                  <span className="flex items-center gap-3 min-w-0">
-                    <Icon
-                      size={18}
-                      strokeWidth={isActive ? 2.1 : 1.85}
-                      aria-hidden="true"
-                      className={`shrink-0 transition-colors ${
+                  <span className={`flex items-center ${isCollapsedView ? 'justify-center' : 'gap-2.5'} min-w-0`}>
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                         isActive
-                          ? 'text-blue-600'
-                          : 'text-slate-400 group-hover:text-slate-700'
+                          ? 'bg-white/20 text-white'
+                          : 'text-slate-600 group-hover:text-blue-600 group-hover:bg-blue-50'
                       }`}
-                    />
+                    >
+                      <Icon
+                        size={17}
+                        strokeWidth={isActive ? 2.2 : 2}
+                        aria-hidden="true"
+                        className="shrink-0"
+                      />
+                    </div>
                     {!isCollapsedView && <span className="truncate">{item.name}</span>}
                   </span>
 
                   {!isCollapsedView && item.liveDot && (
                     <span
                       title="Live webhook stream active"
-                      className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"
-                      aria-hidden="true"
-                    />
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-400/40 text-emerald-300"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      LIVE
+                    </span>
                   )}
                 </Link>
               );
@@ -225,21 +227,24 @@ export default function Sidebar() {
         ))}
 
         {/* Administration & Security Section */}
-        <div className="pt-3 border-t border-slate-200/70 space-y-1">
-          {!isCollapsedView && (
+        <div className="pt-2 border-t border-slate-200/80 space-y-1">
+          {!isCollapsedView ? (
             <button
               type="button"
               onClick={() => setAdminOpen((prev) => !prev)}
               aria-expanded={adminOpen}
-              className="w-full flex items-center justify-between px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-400 hover:text-slate-700 transition-colors"
+              className="w-full flex items-center justify-between px-3 pt-1 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
             >
               <span>Administration</span>
               <ChevronDown
                 size={14}
+                strokeWidth={2}
                 aria-hidden="true"
                 className={`transition-transform duration-150 ${adminOpen ? 'rotate-180' : ''}`}
               />
             </button>
+          ) : (
+            <div className="h-px bg-slate-200/80 my-1 mx-1" />
           )}
 
           {(adminOpen || isCollapsedView) &&
@@ -254,29 +259,31 @@ export default function Sidebar() {
                   title={isCollapsedView ? item.name : undefined}
                   aria-current={isActive ? 'page' : undefined}
                   className={`relative flex items-center ${
-                    isCollapsedView ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2'
-                  } rounded-xl text-[13.5px] leading-5 transition-colors duration-150 group ${
+                    isCollapsedView
+                      ? 'justify-center p-2.5'
+                      : 'gap-2.5 px-3 py-2'
+                  } rounded-xl text-[13.5px] leading-5 transition-all duration-150 group cursor-pointer ${
                     isActive
-                      ? 'bg-blue-50/90 text-blue-700 font-semibold'
-                      : 'text-slate-600 font-medium hover:bg-slate-100/80 hover:text-slate-900'
+                      ? isCollapsedView
+                        ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white font-bold shadow-md shadow-blue-600/30 border border-blue-400/30'
+                        : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white font-bold shadow-md shadow-blue-600/25 border border-blue-500/30'
+                      : 'text-slate-700 font-semibold hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
-                  {isActive && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-blue-600"
-                    />
-                  )}
-                  <Icon
-                    size={18}
-                    strokeWidth={isActive ? 2.1 : 1.85}
-                    aria-hidden="true"
-                    className={`shrink-0 transition-colors ${
+                  <div
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                       isActive
-                        ? 'text-blue-600'
-                        : 'text-slate-400 group-hover:text-slate-700'
+                        ? 'bg-white/20 text-white'
+                        : 'text-slate-600 group-hover:text-blue-600 group-hover:bg-blue-50'
                     }`}
-                  />
+                  >
+                    <Icon
+                      size={17}
+                      strokeWidth={isActive ? 2.2 : 2}
+                      aria-hidden="true"
+                      className="shrink-0"
+                    />
+                  </div>
                   {!isCollapsedView && <span className="truncate">{item.name}</span>}
                 </Link>
               );
@@ -285,40 +292,40 @@ export default function Sidebar() {
       </nav>
 
       {/* Authenticated Administrator Footer */}
-      <div className="p-3 border-t border-slate-200/80 bg-slate-50/60 shrink-0">
+      <div className="p-3 border-t border-slate-200/80 bg-slate-50/80 shrink-0">
         {isCollapsedView ? (
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-2.5">
             <Link
               href="/account"
               title={`${user?.name || 'Administrator'} · Admin Security`}
-              className="relative w-9 h-9 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center justify-center hover:bg-slate-800 transition-colors"
+              className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 text-white text-xs font-bold flex items-center justify-center hover:shadow-md transition-all border border-slate-700 cursor-pointer"
             >
               {getInitials(user?.name)}
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white bg-emerald-500" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-white bg-emerald-500" />
             </Link>
             <button
               type="button"
               onClick={() => logout()}
-              title="Sign Out"
+              title="Sign Out of Admin Console"
               aria-label="Sign out"
-              className="p-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
             >
-              <LogOut size={16} strokeWidth={1.9} aria-hidden="true" />
+              <LogOut size={16} strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
         ) : (
-          <div className="rounded-xl bg-white border border-slate-200/90 p-2.5 shadow-2xs">
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-2.5 shadow-2xs">
             <div className="flex items-center justify-between gap-2">
-              <Link href="/account" className="flex items-center gap-2.5 min-w-0 group">
-                <div className="relative w-8 h-8 rounded-lg bg-slate-900 text-white text-xs font-bold flex items-center justify-center shrink-0">
+              <Link href="/account" className="flex items-center gap-2.5 min-w-0 group cursor-pointer">
+                <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-2xs">
                   {getInitials(user?.name)}
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white bg-emerald-500" />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-white bg-emerald-500" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-slate-900 truncate group-hover:text-blue-700 transition-colors leading-tight">
+                  <p className="text-[13px] font-bold text-slate-900 truncate group-hover:text-blue-700 transition-colors leading-tight">
                     {user?.name || 'Administrator'}
                   </p>
-                  <p className="text-[11px] text-slate-500 font-medium truncate leading-tight mt-0.5">
+                  <p className="text-[11px] text-slate-500 font-semibold truncate leading-tight mt-0.5">
                     Administrator{user?.employee_id ? ` · ${user.employee_id}` : ''}
                   </p>
                 </div>
@@ -329,9 +336,9 @@ export default function Sidebar() {
                 onClick={() => logout()}
                 title="Sign out of Admin Console"
                 aria-label="Sign out of Admin Console"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+                className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 cursor-pointer"
               >
-                <LogOut size={16} strokeWidth={1.9} aria-hidden="true" />
+                <LogOut size={16} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -343,8 +350,8 @@ export default function Sidebar() {
   return (
     <>
       <aside
-        className={`hidden lg:block sticky top-0 h-screen shrink-0 z-30 transition-[width] duration-200 ease-out ${
-          sidebarCollapsed ? 'w-[76px]' : 'w-[264px]'
+        className={`hidden lg:block sticky top-0 h-screen shrink-0 z-30 transition-all duration-200 ease-in-out ${
+          sidebarCollapsed ? 'w-[72px]' : 'w-[264px]'
         }`}
       >
         {renderSidebarBody(sidebarCollapsed)}
