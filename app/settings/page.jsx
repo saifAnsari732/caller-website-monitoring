@@ -154,21 +154,16 @@ export default function SettingsPage() {
       redirectUri = 'https://caller-website-monitoring.vercel.app/api/meta/oauth/callback';
     }
     const appId = status?.appId || '1007200718473332';
-    const configId = status?.configId;
+    const configId = status?.configId || '2583186895497299';
 
-    let authUrl = status?.authUrl;
-    if (!authUrl) {
-      if (configId) {
-        authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
-          redirectUri
-        )}&config_id=${encodeURIComponent(configId)}&response_type=code&state=kisan_meta_oauth_${Date.now()}`;
-      } else {
-        const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_ads,leads_retrieval';
-        authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
-          redirectUri
-        )}&scope=${encodeURIComponent(scopes)}&response_type=code&state=kisan_meta_oauth_${Date.now()}`;
-      }
-    }
+    // Facebook Login for Business strictly requires config_id, response_type=code, and auth_type=rerequest
+    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${encodeURIComponent(
+      appId
+    )}&redirect_uri=${encodeURIComponent(
+      redirectUri
+    )}&config_id=${encodeURIComponent(
+      configId
+    )}&response_type=code&auth_type=rerequest&state=kisan_meta_oauth_${Date.now()}`;
 
     const width = 640;
     const height = 720;
@@ -622,7 +617,7 @@ export default function SettingsPage() {
             <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-200/70">
               <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider block">Active Lead Forms</span>
               <span className="text-2xl font-bold font-heading text-indigo-800 tabular-nums">{metaForms.length}</span>
-              <p className="text-[11px] text-indigo-600 mt-0.5">Page: Kisan Choice</p>
+              <p className="text-[11px] text-indigo-600 mt-0.5">Page: {status?.pageName || 'Connected Page'}</p>
             </div>
           </div>
         </div>

@@ -25,6 +25,7 @@ import {
 
 export default function BrowserPage() {
   const [forms, setForms] = useState([]);
+  const [pageName, setPageName] = useState('Connected Page');
   const [totalDbMetaLeads, setTotalDbMetaLeads] = useState(0);
   const [selectedFormId, setSelectedFormId] = useState('');
   const [browserData, setBrowserData] = useState(null);
@@ -54,6 +55,7 @@ export default function BrowserPage() {
     try {
       const res = await fetch('/api/meta/forms');
       const data = await res.json();
+      if (data.pageName) setPageName(data.pageName);
       if (Array.isArray(data.forms)) {
         setForms(data.forms);
         setTotalDbMetaLeads(Number(data.totalDbMetaLeads) || 0);
@@ -232,7 +234,7 @@ export default function BrowserPage() {
     <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
       <Header
         title="Meta Lead Forms & Live Responses Explorer"
-        subtitle="Inspect all connected Facebook & Instagram Lead Ads forms for Kisan Choice, review question schemas, and audit synced CRM prospects"
+        subtitle={`Inspect all connected Facebook & Instagram Lead Ads forms for ${pageName}, review question schemas, and audit synced CRM prospects`}
       />
 
       <main className="px-5 lg:px-7 py-6 space-y-5 flex-1 w-full max-w-none">
@@ -262,7 +264,7 @@ export default function BrowserPage() {
                 {forms.length}
               </p>
               <p className="text-xs text-slate-500 mt-1 font-medium">
-                <span className="text-emerald-600 font-semibold">{activeFormsCount} Active</span> · Page: Kisan Choice
+                <span className="text-emerald-600 font-semibold">{activeFormsCount} Active</span> · Page: {pageName}
               </p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
