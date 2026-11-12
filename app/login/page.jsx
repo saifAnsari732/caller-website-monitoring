@@ -231,7 +231,7 @@ function LoginContent() {
                     required
                     aria-invalid={Boolean(fieldErrors.identifier)}
                     aria-describedby={fieldErrors.identifier ? 'identifier-error' : undefined}
-                    placeholder="e.g. 9876543210 or admin@kisanindia.com"
+                    placeholder="Enter 10-digit mobile or admin email"
                     className={`w-full pl-10 pr-4 py-2.5 text-base sm:text-sm bg-white border rounded-xl text-slate-900 placeholder-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
                       fieldErrors.identifier
                         ? 'border-rose-400 focus:border-rose-500'

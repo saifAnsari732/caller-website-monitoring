@@ -91,9 +91,9 @@ export default function SettingsPage() {
 
   // Webhook Simulator state
   const [simFormId, setSimFormId] = useState('');
-  const [simName, setSimName] = useState('Rajesh Agro Traders');
-  const [simMobile, setSimMobile] = useState('9876543210');
-  const [simProduct, setSimProduct] = useState('Mustard Oil 15L Tin Dealership');
+  const [simName, setSimName] = useState('');
+  const [simMobile, setSimMobile] = useState('');
+  const [simProduct, setSimProduct] = useState('');
   const [simulatingWebhook, setSimulatingWebhook] = useState(false);
   const [simResult, setSimResult] = useState(null);
 
@@ -342,9 +342,9 @@ export default function SettingsPage() {
           action: 'TEST_EVENT',
           eventName,
           value: eventName === 'Purchase' ? 10000 : 2500,
-          testName: 'Kisan Choice Distributor Indore',
-          testMobile: '9876543210',
-          testEmail: 'distributor@indore.kisanindia.com'
+          testName: 'Enterprise Client',
+          testMobile: '9905234866',
+          testEmail: 'operations@kisanindia.com'
         })
       });
       const data = await res.json();
@@ -982,7 +982,7 @@ export default function SettingsPage() {
                       <span>Interactive Webhook Leadgen Simulator</span>
                     </h4>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Test-fire a mock Meta Lead Ads event to test round-robin routing &amp; ingestion
+                      Test-fire a live Meta Lead Ads event to test round-robin routing &amp; ingestion
                     </p>
                   </div>
                 </div>
@@ -995,6 +995,7 @@ export default function SettingsPage() {
                         type="text"
                         value={simName}
                         onChange={(e) => setSimName(e.target.value)}
+                        placeholder="Enter prospect name"
                         className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold"
                         required
                       />
@@ -1005,6 +1006,7 @@ export default function SettingsPage() {
                         type="tel"
                         value={simMobile}
                         onChange={(e) => setSimMobile(e.target.value)}
+                        placeholder="10-digit mobile number"
                         className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold"
                         required
                       />
@@ -1017,6 +1019,7 @@ export default function SettingsPage() {
                       type="text"
                       value={simProduct}
                       onChange={(e) => setSimProduct(e.target.value)}
+                      placeholder="Enter product inquiry / requirement"
                       className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold"
                       required
                     />

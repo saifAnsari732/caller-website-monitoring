@@ -84,9 +84,9 @@ export async function POST(request) {
 
       const prospect = lead || {
         lead_id: `L-TEST-${Date.now().toString().slice(-4)}`,
-        name: body.testName || 'Kisan Agro Distributor',
-        mobile: body.testMobile || '9876543210',
-        email: body.testEmail || 'dealer@kisanindia.com',
+        name: body.testName || 'Enterprise Partner',
+        mobile: body.testMobile || '9905234866',
+        email: body.testEmail || 'operations@kisanindia.com',
         city: 'Indore',
         state: 'Madhya Pradesh',
         campaign_name: 'Sales - Mirzapur 1 -9/2026, 16:00'
