@@ -27,7 +27,15 @@ import {
   Link2,
   CheckSquare,
   Lock,
-  ChevronRight
+  ChevronRight,
+  Flame,
+  Sparkles,
+  Send,
+  MessageSquare,
+  AlertTriangle,
+  Radio,
+  FileSpreadsheet,
+  Cpu
 } from 'lucide-react';
 
 const CRM_FIELDS = [
@@ -47,7 +55,7 @@ export default function SettingsPage() {
   const [banner, setBanner] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [formFilter, setFormFilter] = useState('ALL'); // 'ALL' | 'WITH_LEADS' | 'ACTIVE' | 'PAUSED'
-  const [activeTab, setActiveTab] = useState('FORMS'); // 'FORMS' | 'WEBHOOK' | 'OAUTH'
+  const [activeTab, setActiveTab] = useState('FORMS'); // 'FORMS' | 'CAPI' | 'QUALITY' | 'WEBHOOK' | 'DIAGNOSTICS'
 
   // Sync states
   const [syncingFormId, setSyncingFormId] = useState(null);
@@ -55,19 +63,43 @@ export default function SettingsPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Modal states
-  const [isFbModalOpen, setIsFbModalOpen] = useState(false);
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
   const [editingForm, setEditingForm] = useState(null);
   const [availableQuestions, setAvailableQuestions] = useState([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
-  // OAuth Form States
+  // Token input state
   const [customToken, setCustomToken] = useState('');
   const [savingFb, setSavingFb] = useState(false);
   const [showTokenInput, setShowTokenInput] = useState(false);
 
   // Field mapping state for currently edited form
   const [currentMapping, setCurrentMapping] = useState({});
+
+  // CAPI state
+  const [capiConfig, setCapiConfig] = useState({
+    pixelId: '',
+    enabled: false,
+    testEventCode: '',
+    autoSendOnInterested: true,
+    autoSendOnClosed: true
+  });
+  const [savingCapi, setSavingCapi] = useState(false);
+  const [capiEvents, setCapiEvents] = useState([]);
+  const [testingCapi, setTestingCapi] = useState(false);
+  const [capiTestResult, setCapiTestResult] = useState(null);
+
+  // Webhook Simulator state
+  const [simFormId, setSimFormId] = useState('');
+  const [simName, setSimName] = useState('Rajesh Agro Traders');
+  const [simMobile, setSimMobile] = useState('9876543210');
+  const [simProduct, setSimProduct] = useState('Mustard Oil 15L Tin Dealership');
+  const [simulatingWebhook, setSimulatingWebhook] = useState(false);
+  const [simResult, setSimResult] = useState(null);
+
+  // Token Health Diagnostic state
+  const [tokenHealth, setTokenHealth] = useState(null);
+  const [loadingHealth, setLoadingHealth] = useState(false);
 
   const showToast = (msg) => {
     setBanner(msg);
@@ -79,11 +111,26 @@ export default function SettingsPage() {
       const res = await fetch('/api/meta/status');
       const data = await res.json();
       setStatus(data);
+      if (data.metaCapiConfig) setCapiConfig(data.metaCapiConfig);
+      if (data.metaCapiLogs) setCapiEvents(data.metaCapiLogs);
     } catch (e) {
       console.error('Fetch status error:', e);
     } finally {
       setPageLoading(false);
       setRefreshing(false);
+    }
+  }, []);
+
+  const fetchTokenHealth = useCallback(async () => {
+    setLoadingHealth(true);
+    try {
+      const res = await fetch('/api/meta/token-health');
+      const data = await res.json();
+      setTokenHealth(data);
+    } catch (err) {
+      console.error('Token health fetch failed:', err);
+    } finally {
+      setLoadingHealth(false);
     }
   }, []);
 
@@ -93,12 +140,16 @@ export default function SettingsPage() {
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
+  useEffect(() => {
+    if (activeTab === 'DIAGNOSTICS' && !tokenHealth) {
+      fetchTokenHealth();
+    }
+  }, [activeTab, tokenHealth, fetchTokenHealth]);
+
   // Open Real Meta OAuth Flow
   const handleLaunchMetaOAuth = () => {
     let redirectUri = `${window.location.origin}/api/meta/oauth/callback`;
     if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      // In Meta Live mode, HTTP localhost redirects are rejected by Facebook Enforce HTTPS policy.
-      // We route the OAuth dialog redirect through our verified production domain callback
       redirectUri = 'https://caller-website-monitoring.vercel.app/api/meta/oauth/callback';
     }
     const appId = status?.appId || '1007200718473332';
@@ -119,79 +170,81 @@ export default function SettingsPage() {
 
     const onMessage = (event) => {
       if (event.data?.type === 'META_OAUTH_SUCCESS') {
-        window.removeEventListener('message', onMessage);
-        showToast(`Connected Facebook Page "${event.data.pageName}" via Meta OAuth 2.0!`);
+        showToast('Meta OAuth 2.0 connected successfully! Long-lived token stored.');
         fetchStatus();
+        window.removeEventListener('message', onMessage);
       }
     };
     window.addEventListener('message', onMessage);
   };
 
-  // Full Meta Refresh (Sync real campaigns, forms & leads from Meta Graph API)
+  // Full Meta Sync
   const handleFullMetaSync = async () => {
     setSyncingAll(true);
     try {
-      const res = await fetch('/api/meta/oauth', {
+      const res = await fetch('/api/meta/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accessToken: customToken.trim() || undefined
-        })
+        body: JSON.stringify({ action: 'SYNC_ALL_ACTIVE_FORMS', countPerForm: 10 })
       });
       const data = await res.json();
       if (data.success) {
-        showToast(data.message || `Meta Sync complete! Synced ${data.formsSynced} forms & ${data.realLeadsIngested} leads.`);
-        await fetchStatus();
+        showToast(`Meta Sync: Ingested ${data.syncedCount || 0} leads across ${data.formsChecked || 0} forms.`);
+        fetchStatus();
       } else {
-        showToast(`Sync alert: ${data.error || 'Failed to complete Meta Sync'}`);
+        showToast(`Sync warning: ${data.error || 'No new leads found.'}`);
       }
     } catch (e) {
-      console.error(e);
-      showToast('Error syncing with Meta Graph API.');
+      showToast('Error syncing forms.');
     } finally {
       setSyncingAll(false);
     }
   };
 
-  // Sync leads for a specific real Meta Lead Form
+  // Sync a single Meta form
   const handleSyncSingleForm = async (formId, formName) => {
     setSyncingFormId(formId);
     try {
       const res = await fetch('/api/meta/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_FORM_LEADS', formId, count: 10 })
+        body: JSON.stringify({ action: 'SYNC_SINGLE_FORM', formId, count: 20 })
       });
       const data = await res.json();
       if (data.success) {
-        showToast(data.message || `Synced ${data.syncedCount} real leads from "${formName}"!`);
+        showToast(`Synced ${data.syncedCount || 0} leads from "${formName}".`);
         fetchStatus();
       } else {
-        showToast(`Notice: ${data.error || 'No new leads found on Meta'}`);
+        showToast(data.error || 'No new leads on this form.');
       }
     } catch (e) {
-      console.error(e);
-      showToast('Error connecting to Meta Graph API.');
+      showToast('Sync failed.');
     } finally {
       setSyncingFormId(null);
     }
   };
 
-  // Open Field Mapping Modal for a real form
+  // Open Field Mapping Modal
   const handleOpenFieldMapping = async (form) => {
     setEditingForm(form);
-    setCurrentMapping(form.fieldMapping || {});
     setIsMappingModalOpen(true);
     setLoadingQuestions(true);
+    setCurrentMapping(form.fieldMapping || {});
 
     try {
-      const res = await fetch('/api/meta/forms');
+      const res = await fetch(`/api/meta/forms?formId=${form.formId}`);
       const data = await res.json();
-      const matched = (data.forms || []).find(f => f.id === form.formId);
-      if (matched && matched.questions) {
-        setAvailableQuestions(matched.questions);
+      if (Array.isArray(data.questions) && data.questions.length > 0) {
+        setAvailableQuestions(data.questions);
       } else {
-        setAvailableQuestions([]);
+        setAvailableQuestions([
+          { key: 'full_name', label: 'Full Name', mappedTo: 'name' },
+          { key: 'phone_number', label: 'Phone Number', mappedTo: 'mobile' },
+          { key: 'email', label: 'Email Address', mappedTo: 'email' },
+          { key: 'city', label: 'City', mappedTo: 'city' },
+          { key: 'business_type', label: 'Business Type', mappedTo: 'business_type' },
+          { key: 'product_interest', label: 'Product Interest', mappedTo: 'product_interest' }
+        ]);
       }
     } catch (e) {
       console.error(e);
@@ -200,7 +253,7 @@ export default function SettingsPage() {
     }
   };
 
-  // Save updated Field Mapping to MongoDB
+  // Save updated Field Mapping
   const handleSaveFieldMapping = async () => {
     if (!editingForm) return;
     try {
@@ -230,7 +283,6 @@ export default function SettingsPage() {
         fetchStatus();
       }
     } catch (e) {
-      console.error(e);
       showToast('Failed to save field mapping.');
     }
   };
@@ -250,6 +302,117 @@ export default function SettingsPage() {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Save CAPI Config
+  const handleSaveCapiConfig = async (e) => {
+    e.preventDefault();
+    setSavingCapi(true);
+    try {
+      const res = await fetch('/api/meta/capi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'UPDATE_CONFIG',
+          ...capiConfig
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Meta Conversions API (CAPI) settings updated!');
+        fetchStatus();
+      }
+    } catch (err) {
+      showToast('Failed to save CAPI settings.');
+    } finally {
+      setSavingCapi(false);
+    }
+  };
+
+  // Test-Fire CAPI Event
+  const handleTestCapiEvent = async (eventName = 'QualifiedLead') => {
+    setTestingCapi(true);
+    setCapiTestResult(null);
+    try {
+      const res = await fetch('/api/meta/capi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TEST_EVENT',
+          eventName,
+          value: eventName === 'Purchase' ? 10000 : 2500,
+          testName: 'Kisan Choice Distributor Indore',
+          testMobile: '9876543210',
+          testEmail: 'distributor@indore.kisanindia.com'
+        })
+      });
+      const data = await res.json();
+      setCapiTestResult(data);
+      if (data.success) {
+        showToast(`CAPI Event "${eventName}" dispatched successfully!`);
+        fetchStatus();
+      }
+    } catch (err) {
+      showToast('CAPI test failed.');
+    } finally {
+      setTestingCapi(false);
+    }
+  };
+
+  // Run Webhook Simulation
+  const handleRunWebhookSimulator = async (e) => {
+    e.preventDefault();
+    setSimulatingWebhook(true);
+    setSimResult(null);
+
+    const payload = {
+      object: 'page',
+      entry: [
+        {
+          id: status?.pageId || '933429549844450',
+          time: Math.floor(Date.now() / 1000),
+          changes: [
+            {
+              field: 'leadgen',
+              value: {
+                ad_id: '12021590483920042',
+                form_id: simFormId || status?.metaForms?.[0]?.formId || '1768141694388234',
+                leadgen_id: `SIM-${Date.now()}`,
+                created_time: Math.floor(Date.now() / 1000),
+                campaign_name: 'Sales - Mirzapur 1 -9/2026, 16:00',
+                field_data: [
+                  { name: 'full_name', values: [simName] },
+                  { name: 'phone_number', values: [simMobile] },
+                  { name: 'email', values: ['lead@kisanchoice.com'] },
+                  { name: 'city', values: ['Indore'] },
+                  { name: 'product_interest', values: [simProduct] }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    try {
+      const res = await fetch('/api/webhooks/meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setSimResult(data);
+      if (data.success) {
+        showToast(`Webhook Ingestion Simulated: Lead ${data.lead_id} assigned to ${data.assignedTo}!`);
+        fetchStatus();
+      } else {
+        showToast(data.error || 'Simulation returned non-success');
+      }
+    } catch (err) {
+      showToast('Webhook simulation failed.');
+    } finally {
+      setSimulatingWebhook(false);
     }
   };
 
@@ -279,13 +442,13 @@ export default function SettingsPage() {
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
       <Header
-        title="Meta Lead Ads Integration Hub"
-        subtitle="Live Facebook & Instagram Lead Ads sync, real OAuth 2.0 connection, leadgen forms routing & webhook telemetry"
+        title="Meta Lead Ads Enterprise Integration Suite"
+        subtitle="Graph v21.0 sync, Conversions API (CAPI), AI anti-spam scoring, live webhook simulator & zero-loss telemetry"
       />
 
-      <main className="px-5 lg:px-7 py-6 space-y-6 flex-1 w-full max-w-none">
+      <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full max-w-none">
         {banner && (
-          <div className="px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center justify-between shadow-2xs">
+          <div className="px-4 py-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center justify-between shadow-2xs">
             <div className="flex items-center gap-2">
               <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
               <span>{banner}</span>
@@ -297,11 +460,13 @@ export default function SettingsPage() {
         )}
 
         {/* Hero Card: Connected Facebook Page & Live Meta Status */}
-        <div className="crm-card p-6 lg:p-7">
+        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 lg:p-7 relative overflow-hidden">
+          <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500 absolute top-0 left-0 right-0" />
+
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pb-6 border-b border-slate-100">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#1877F2] text-white flex items-center justify-center shrink-0 shadow-sm">
-                <Facebook size={22} />
+              <div className="w-12 h-12 rounded-2xl bg-[#1877F2] text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+                <Facebook size={24} />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2.5 flex-wrap">
@@ -309,15 +474,15 @@ export default function SettingsPage() {
                     {status?.pageName || 'Kisan Choice'}
                   </h2>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    Meta Graph v21.0 Connected
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Meta Graph v21.0 Active
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                     Page ID: {status?.pageId || '933429549844450'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 font-medium">
-                  Ad Account: <strong className="text-slate-700">{status?.adAccountId || 'act_1796071777698019'} (Kisan Kumar)</strong> · Meta App: <strong className="text-slate-700">kisanGroups ({status?.appId || '1007200718473332'})</strong>
+                  Ad Account: <strong className="text-slate-700">{status?.adAccountId || 'act_1796071777698019'} (Kisan Kumar)</strong> • Meta App: <strong className="text-slate-700">kisanGroups ({status?.appId || '1007200718473332'})</strong>
                 </p>
               </div>
             </div>
@@ -326,7 +491,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <button
                 onClick={handleLaunchMetaOAuth}
-                className="px-4 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white text-xs font-semibold transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer"
               >
                 <Facebook size={15} />
                 <span>Launch Meta OAuth 2.0</span>
@@ -335,399 +500,656 @@ export default function SettingsPage() {
               <button
                 onClick={handleFullMetaSync}
                 disabled={syncingAll}
-                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {syncingAll ? <Loader2 size={15} className="animate-spin text-white" /> : <RefreshCw size={15} />}
-                <span>Sync All Forms & Leads</span>
+                <span>Sync All Forms &amp; Leads</span>
               </button>
 
               <button
                 onClick={() => setShowTokenInput(!showTokenInput)}
-                className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <KeyRound size={14} className="text-slate-500" />
-                <span>Access Token</span>
+                <span>Token</span>
               </button>
             </div>
           </div>
 
-          {/* Collapsible Token Update Drawer */}
-          {showTokenInput && (
-            <div className="pt-5 pb-2">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <KeyRound size={14} className="text-blue-600" /> Page Access Token & System Credentials
-                  </h4>
-                  <span className="text-[11px] text-slate-500 font-medium">Valid Meta Token Active</span>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    placeholder="Paste Meta Page Access Token (EAAOUCzEKyHQB...)"
-                    value={customToken}
-                    onChange={(e) => setCustomToken(e.target.value)}
-                    className="flex-1 px-3.5 py-2 text-xs font-mono bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                  <button
-                    onClick={handleFullMetaSync}
-                    disabled={syncingAll || !customToken.trim()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-40 cursor-pointer"
-                  >
-                    Save & Test
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Real Live Metrics Bar */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-6">
-            <div className="p-4 rounded-xl bg-slate-50/90 border border-slate-200/70">
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Real Leads</div>
-              <div className="text-2xl font-heading font-extrabold text-slate-900 mt-1 tabular-nums">
-                {stats.totalMetaLeads}
-              </div>
-              <div className="text-xs text-slate-500 mt-0.5 font-medium">Ingested from Meta Lead Ads</div>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6">
+            <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Real Leads</span>
+              <span className="text-2xl font-bold font-heading text-slate-900 tabular-nums">{stats.totalMetaLeads}</span>
+              <p className="text-[11px] text-slate-500 mt-0.5">Ingested from Meta Lead Ads</p>
             </div>
 
-            <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200/60">
-              <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Today Leads</div>
-              <div className="text-2xl font-heading font-extrabold text-blue-700 mt-1 tabular-nums">
-                {stats.todayLeads}
-              </div>
-              <div className="text-xs text-blue-600 mt-0.5 font-medium">Live incoming pipeline</div>
+            <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200/70">
+              <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider block">Today Leads</span>
+              <span className="text-2xl font-bold font-heading text-blue-800 tabular-nums">{stats.todayLeads}</span>
+              <p className="text-[11px] text-blue-600 mt-0.5">Live incoming pipeline</p>
             </div>
 
-            <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200/60">
-              <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Assigned to Agents</div>
-              <div className="text-2xl font-heading font-extrabold text-emerald-700 mt-1 tabular-nums">
-                {stats.assignedLeads}
-              </div>
-              <div className="text-xs text-emerald-600 mt-0.5 font-medium">Cyclic Round-Robin Pool</div>
+            <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/70">
+              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">Assigned to Agents</span>
+              <span className="text-2xl font-bold font-heading text-emerald-800 tabular-nums">{stats.assignedLeads}</span>
+              <p className="text-[11px] text-emerald-600 mt-0.5">Cyclic Round-Robin Pool</p>
             </div>
 
-            <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-200/60">
-              <div className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">Active Lead Forms</div>
-              <div className="text-2xl font-heading font-extrabold text-indigo-700 mt-1 tabular-nums">
-                {metaForms.length}
-              </div>
-              <div className="text-xs text-indigo-600 mt-0.5 font-medium">Page: Kisan Choice</div>
+            <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-200/70">
+              <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider block">Active Lead Forms</span>
+              <span className="text-2xl font-bold font-heading text-indigo-800 tabular-nums">{metaForms.length}</span>
+              <p className="text-[11px] text-indigo-600 mt-0.5">Page: Kisan Choice</p>
             </div>
           </div>
         </div>
 
-        {/* Tab Switcher & Full-Width Filter Toolbar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-3.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setActiveTab('FORMS')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'FORMS'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
-              }`}
-            >
-              Real Meta Lead Forms ({metaForms.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('WEBHOOK')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'WEBHOOK'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
-              }`}
-            >
-              Webhook & Zero-Loss Engine
-            </button>
-          </div>
+        {/* 5 Enterprise Navigation Tabs */}
+        <div className="flex items-center gap-1.5 p-1.5 bg-slate-200/60 rounded-2xl overflow-x-auto">
+          {[
+            { id: 'FORMS', label: `Real Meta Lead Forms (${metaForms.length})`, icon: FileSpreadsheet },
+            { id: 'CAPI', label: 'Conversions API (CAPI)', icon: Zap },
+            { id: 'QUALITY', label: 'AI Lead Quality & Anti-Spam', icon: Sparkles },
+            { id: 'WEBHOOK', label: 'Webhook & Live Simulator', icon: Radio },
+            { id: 'DIAGNOSTICS', label: 'Token & Scopes Health', icon: Cpu }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <Icon size={15} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-          {activeTab === 'FORMS' && (
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                {[
-                  { id: 'ALL', label: `All (${metaForms.length})` },
-                  { id: 'WITH_LEADS', label: `With Leads (${metaForms.filter((f) => Number(f.leadsCaptured) > 0).length})` },
-                  { id: 'ACTIVE', label: `Active (${metaForms.filter((f) => f.active !== false).length})` },
-                  { id: 'PAUSED', label: `Paused (${metaForms.filter((f) => f.active === false).length})` }
-                ].map((tab) => (
+        {/* TAB 1: Real Meta Lead Forms */}
+        {activeTab === 'FORMS' && (
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="relative w-full sm:w-80">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search forms by name, campaign, or ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                {['ALL', 'WITH_LEADS', 'ACTIVE', 'PAUSED'].map((f) => (
                   <button
-                    key={tab.id}
-                    onClick={() => setFormFilter(tab.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      formFilter === tab.id
-                        ? 'bg-white text-slate-900 shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                    key={f}
+                    onClick={() => setFormFilter(f)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                      formFilter === f
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {tab.label}
+                    {f === 'ALL' ? 'All Forms' : f.replace('_', ' ')}
                   </button>
                 ))}
               </div>
-
-              <div className="relative min-w-[260px]">
-                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search forms, ID, or campaign..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* TAB 1: Real Meta Lead Forms Table */}
-        {activeTab === 'FORMS' && (
-          <div className="crm-card overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="font-heading font-bold text-sm text-slate-900">
-                  Live Facebook & Instagram Lead Ads Forms
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Real forms bound to Page "Kisan Choice" (ID: 933429549844450) with automated cyclic distribution
-                </p>
-              </div>
-              <button
-                onClick={handleFullMetaSync}
-                disabled={syncingAll}
-                className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
-              >
-                <RefreshCw size={13} className={syncingAll ? 'animate-spin' : ''} />
-                <span>Refresh from Meta</span>
-              </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="py-3.5 px-5">Lead Form & Meta ID</th>
-                    <th className="py-3.5 px-4">Mapped Campaign</th>
-                    <th className="py-3.5 px-4">Distribution Strategy</th>
-                    <th className="py-3.5 px-4">Assigned Team</th>
-                    <th className="py-3.5 px-4 text-center">Status</th>
-                    <th className="py-3.5 px-4 text-right">Captured</th>
-                    <th className="py-3.5 px-5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {filteredForms.length === 0 ? (
+            {/* Forms Table */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                     <tr>
-                      <td colSpan="7" className="py-12 text-center text-slate-400">
-                        No lead forms found. Click "Sync All Forms & Leads" to pull forms from Meta Graph API.
-                      </td>
+                      <th className="py-3.5 px-6">Lead Form &amp; Meta ID</th>
+                      <th className="py-3.5 px-4">Mapped Campaign</th>
+                      <th className="py-3.5 px-4">Distribution Strategy</th>
+                      <th className="py-3.5 px-4">Assigned Team</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-center">Captured</th>
+                      <th className="py-3.5 px-6 text-right">Actions</th>
                     </tr>
-                  ) : (
-                    filteredForms.map((form) => {
-                      const isSyncing = syncingFormId === form.formId;
-                      return (
-                        <tr key={form.formId} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="py-4 px-5">
-                            <div className="font-bold text-slate-900 flex items-center gap-2">
-                              <span>{form.formName}</span>
-                            </div>
-                            <div className="text-[11px] font-mono text-slate-500 mt-0.5">
-                              ID: {form.formId}
-                            </div>
-                          </td>
-
-                          <td className="py-4 px-4 font-semibold text-slate-700">
-                            {form.campaignName || 'Facebook Meta Lead Ads'}
-                          </td>
-
-                          <td className="py-4 px-4 font-medium text-slate-600">
-                            <span className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-700">
-                              {form.distributionRule === 'LOAD_BALANCED' ? 'Load-Balanced Pool' : 'Auto Round-Robin'}
-                            </span>
-                          </td>
-
-                          <td className="py-4 px-4 font-semibold text-slate-800">
-                            {form.assignedTeam || 'North Region Sales'}
-                          </td>
-
-                          <td className="py-4 px-4 text-center">
-                            <button
-                              onClick={() => handleToggleForm(form.formId)}
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
-                                form.active !== false
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                  : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
-                              }`}
-                            >
-                              {form.active !== false ? 'Active' : 'Paused'}
-                            </button>
-                          </td>
-
-                          <td className="py-4 px-4 text-right">
-                            <span
-                              className={`inline-flex items-center px-2.5 py-1 rounded-lg font-heading font-extrabold tabular-nums text-xs ${
-                                Number(form.leadsCaptured) > 0
-                                  ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
-                                  : 'text-slate-500'
-                              }`}
-                            >
-                              {form.leadsCaptured || 0}
-                            </span>
-                          </td>
-
-                          <td className="py-4 px-5 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => handleSyncSingleForm(form.formId, form.formName)}
-                                disabled={isSyncing}
-                                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                                title="Fetch fresh leads from Meta"
-                              >
-                                {isSyncing ? <Loader2 size={12} className="animate-spin text-white" /> : <RefreshCw size={12} />}
-                                <span>Sync Leads</span>
-                              </button>
-
-                              <button
-                                onClick={() => handleOpenFieldMapping(form)}
-                                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                                title="Configure question mapping"
-                              >
-                                <SlidersHorizontal size={12} />
-                                <span>Fields</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredForms.map((form) => (
+                      <tr key={form.formId} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-4 px-6">
+                          <div className="font-bold text-slate-900 text-sm">{form.formName}</div>
+                          <div className="text-[11px] font-mono text-slate-400 mt-0.5">ID: {form.formId}</div>
+                        </td>
+                        <td className="py-4 px-4 text-slate-700 font-medium">
+                          {form.campaignName || form.formName}
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                            {form.distributionRule === 'DIRECT_CALLER' ? 'Direct Caller' : 'Auto Round-Robin'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-slate-700 font-semibold">
+                          {form.assignedTeam || 'North Region Sales'}
+                        </td>
+                        <td className="py-4 px-4">
+                          <button
+                            onClick={() => handleToggleForm(form.formId)}
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer ${
+                              form.active !== false
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            {form.active !== false ? 'Active' : 'Paused'}
+                          </button>
+                        </td>
+                        <td className="py-4 px-4 text-center font-bold text-slate-900 tabular-nums">
+                          {form.leadsCaptured || 0}
+                        </td>
+                        <td className="py-4 px-6 text-right space-x-2 whitespace-nowrap">
+                          <button
+                            onClick={() => handleSyncSingleForm(form.formId, form.formName)}
+                            disabled={syncingFormId === form.formId}
+                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-[11px] shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                          >
+                            {syncingFormId === form.formId ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                            <span>Sync Leads</span>
+                          </button>
+                          <button
+                            onClick={() => handleOpenFieldMapping(form)}
+                            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] cursor-pointer"
+                          >
+                            Fields
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
 
-        {/* TAB 2: Webhook Health & Zero-Loss Engine */}
-        {activeTab === 'WEBHOOK' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <ShieldCheck size={22} />
-                </div>
-                <div>
-                  <h3 className="font-heading font-bold text-sm text-slate-900">
-                    Real-time Meta Leadgen Webhook
-                  </h3>
-                  <p className="text-xs text-slate-500">Live webhook listener subscribed to Meta Page events</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Callback URL
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={status?.webhookUrl || 'https://caller-website-monitoring.vercel.app/api/webhooks/meta'}
-                      className="w-full px-3.5 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(status?.webhookUrl || 'https://caller-website-monitoring.vercel.app/api/webhooks/meta');
-                        showToast('Webhook URL copied to clipboard!');
-                      }}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
-                    >
-                      <Copy size={14} />
-                    </button>
+        {/* TAB 2: Meta Conversions API (CAPI) */}
+        {activeTab === 'CAPI' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column: CAPI Configuration & Test Dispatcher */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-md">
+                    <Zap size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-heading font-bold text-slate-900">
+                      Server-Side Conversions API (CAPI) Setup
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Dispatches offline lead qualification events to Meta for ad optimization
+                    </p>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Verify Token
-                  </label>
-                  <div className="flex items-center gap-2">
+                <form onSubmit={handleSaveCapiConfig} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Meta Pixel / Dataset ID
+                    </label>
                     <input
                       type="text"
-                      readOnly
-                      value={status?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY'}
-                      className="w-full px-3.5 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold"
+                      placeholder="e.g. 1007200718473332 or 123456789012345"
+                      value={capiConfig.pixelId || ''}
+                      onChange={(e) => setCapiConfig({ ...capiConfig, pixelId: e.target.value })}
+                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Meta Events Manager Test Event Code (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. TEST12345 (Found in Meta Events Manager > Test Events tab)"
+                      value={capiConfig.testEventCode || ''}
+                      onChange={(e) => setCapiConfig({ ...capiConfig, testEventCode: e.target.value })}
+                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <label className="flex items-center gap-2.5 text-xs font-medium text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={capiConfig.autoSendOnInterested}
+                        onChange={(e) => setCapiConfig({ ...capiConfig, autoSendOnInterested: e.target.checked })}
+                        className="w-4 h-4 rounded text-blue-600 accent-blue-600"
+                      />
+                      <span>Auto-send <strong className="text-indigo-600">QualifiedLead</strong> event when telecaller marks prospect as Interested</span>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 text-xs font-medium text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={capiConfig.autoSendOnClosed}
+                        onChange={(e) => setCapiConfig({ ...capiConfig, autoSendOnClosed: e.target.checked })}
+                        className="w-4 h-4 rounded text-blue-600 accent-blue-600"
+                      />
+                      <span>Auto-send <strong className="text-emerald-600">Purchase</strong> event (₹10,000 value) when deal is marked Closed / Won</span>
+                    </label>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
                     <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(status?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY');
-                        showToast('Verify token copied!');
-                      }}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
+                      type="submit"
+                      disabled={savingCapi}
+                      className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
                     >
-                      <Copy size={14} />
+                      {savingCapi ? 'Saving CAPI...' : 'Save CAPI Configuration'}
                     </button>
                   </div>
-                </div>
+                </form>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 text-xs text-slate-500 space-y-1.5">
-                <div className="flex items-center gap-2 text-emerald-700 font-semibold">
-                  <Check size={14} /> <span>Facebook Page Webhook Subscribed (`leadgen`)</span>
+              {/* Live Test Event Dispatcher */}
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-heading font-bold text-slate-900 flex items-center gap-2">
+                    <Send size={16} className="text-blue-600" />
+                    <span>Test-Fire Live CAPI Event</span>
+                  </h4>
+                  <span className="text-[11px] font-semibold text-slate-400">Meta Graph API v21.0</span>
                 </div>
-                <div className="flex items-center gap-2 text-emerald-700 font-semibold">
-                  <Check size={14} /> <span>Automatic Cyclic Round-Robin distribution</span>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Test Meta server-side event transmission with SHA-256 hashed phone, email, and city parameters according to Meta specification.
+                </p>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={() => handleTestCapiEvent('QualifiedLead')}
+                    disabled={testingCapi}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {testingCapi ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                    <span>Test "QualifiedLead" (₹2,500)</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleTestCapiEvent('Purchase')}
+                    disabled={testingCapi}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {testingCapi ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    <span>Test "Purchase" (₹10,000)</span>
+                  </button>
                 </div>
-                <div className="flex items-center gap-2 text-emerald-700 font-semibold">
-                  <Check size={14} /> <span>Zero Lead Loss protection active</span>
-                </div>
+
+                {capiTestResult && (
+                  <div className="p-4 rounded-2xl bg-slate-900 text-white text-xs font-mono space-y-2 mt-3 overflow-x-auto">
+                    <div className="flex justify-between text-slate-400 text-[11px]">
+                      <span>Status: {capiTestResult.status}</span>
+                      <span>Latency: {capiTestResult.latencyMs}ms</span>
+                    </div>
+                    <pre className="text-[11px] text-emerald-400 overflow-x-auto">
+                      {JSON.stringify(capiTestResult.payloadSent, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+            {/* Right Column: Sent Events Audit Table */}
+            <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4 flex flex-col h-[600px]">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h4 className="text-sm font-heading font-bold text-slate-900">
+                  Recent CAPI Dispatches
+                </h4>
+                <span className="text-xs font-bold text-blue-600">{capiEvents.length} Logged</span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3">
+                {capiEvents.length === 0 ? (
+                  <div className="text-center py-16 text-slate-400 text-xs">
+                    No CAPI events dispatched yet. Use the buttons on the left to fire your first event.
+                  </div>
+                ) : (
+                  capiEvents.map((evt) => (
+                    <div key={evt.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900">{evt.eventName}</span>
+                        <span className="text-[11px] font-semibold text-emerald-600">₹{evt.value}</span>
+                      </div>
+                      <div className="text-slate-500 text-[11px]">
+                        Lead: <strong className="text-slate-700">{evt.leadName || evt.leadId}</strong>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                        <span className="font-semibold text-blue-600">{evt.status}</span>
+                        <span>{new Date(evt.timestamp).toLocaleTimeString('en-IN')}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: AI Lead Quality & Anti-Spam */}
+        {activeTab === 'QUALITY' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 lg:p-7 space-y-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Sparkles size={22} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-heading font-bold text-slate-900">
+                    AI Lead Intent &amp; Anti-Spam Verification Engine
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                    Evaluates every incoming Facebook &amp; Instagram submission against 4 heuristic layers to filter fake numbers, test inquiries, and score buyer commercial intent before telecaller routing.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <span className="text-xs font-bold text-slate-700 block">Layer 1: Mobile Integrity</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Validates 10-digit Indian mobile prefixes (6, 7, 8, 9) and traps repeated patterns (e.g. 9999999999).
+                  </p>
+                  <span className="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">+35 Score</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <span className="text-xs font-bold text-slate-700 block">Layer 2: Fake Name Trap</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Filters out test inputs ("asdf", "test", "demo", "xyz") and ensures minimum 2 alphabetic characters.
+                  </p>
+                  <span className="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">+25 Score</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <span className="text-xs font-bold text-slate-700 block">Layer 3: Email Validity</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    RFC 5322 syntax validation; boosts genuine business and domain email providers.
+                  </p>
+                  <span className="inline-block px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">+20 Score</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <span className="text-xs font-bold text-slate-700 block">Layer 4: Commercial Intent</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Checks explicit business type (Distributor/Trader) &amp; volume requirement selections.
+                  </p>
+                  <span className="inline-block px-2 py-0.5 rounded bg-purple-50 text-purple-700 text-[10px] font-bold">+20 Score</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: Webhook & Live Simulator */}
+        {activeTab === 'WEBHOOK' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left: Webhook URL & Simulator Form */}
+            <div className="lg:col-span-7 space-y-6">
+              {/* Webhook Credentials Box */}
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4">
+                <h4 className="text-sm font-heading font-bold text-slate-900">
+                  Meta Graph API Webhook Configuration
+                </h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-1">Callback URL (Webhook Receiver)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={status?.webhookUrl || 'https://caller-website-monitoring.vercel.app/api/webhooks/meta'}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-700 select-all"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(status?.webhookUrl || 'https://caller-website-monitoring.vercel.app/api/webhooks/meta');
+                          showToast('Webhook URL copied to clipboard!');
+                        }}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Copy size={13} />
+                        <span>Copy</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-1">Verify Token</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={status?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY'}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-700 select-all"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(status?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY');
+                          showToast('Verify Token copied!');
+                        }}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Copy size={13} />
+                        <span>Copy</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive Webhook Simulator */}
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-heading font-bold text-slate-900 flex items-center gap-2">
+                      <Radio size={16} className="text-blue-600" />
+                      <span>Interactive Webhook Leadgen Simulator</span>
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Test-fire a mock Meta Lead Ads event to test round-robin routing &amp; ingestion
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleRunWebhookSimulator} className="space-y-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Prospect Name</label>
+                      <input
+                        type="text"
+                        value={simName}
+                        onChange={(e) => setSimName(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile Number</label>
+                      <input
+                        type="tel"
+                        value={simMobile}
+                        onChange={(e) => setSimMobile(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Product Inquired</label>
+                    <input
+                      type="text"
+                      value={simProduct}
+                      onChange={(e) => setSimProduct(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      disabled={simulatingWebhook}
+                      className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer"
+                    >
+                      {simulatingWebhook ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                      <span>Trigger Webhook Test</span>
+                    </button>
+                  </div>
+                </form>
+
+                {simResult && (
+                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs space-y-1.5">
+                    <div className="font-bold flex items-center gap-1.5 text-emerald-800">
+                      <CheckCircle2 size={15} />
+                      <span>Ingestion Successful ({simResult.latencyMs}ms)</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                      <div>Lead ID: <strong className="text-slate-900">{simResult.lead_id}</strong></div>
+                      <div>Assigned Telecaller: <strong className="text-blue-700">{simResult.assignedTo}</strong></div>
+                      <div>Quality Score: <strong className="text-emerald-700">{simResult.qualityScore}/100</strong></div>
+                      <div>Intent Tier: <strong className="text-purple-700">{simResult.qualityTier}</strong></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Live Webhook Event Stream */}
+            <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4 flex flex-col h-[560px]">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h4 className="text-sm font-heading font-bold text-slate-900">
+                  Live Webhook Ingestion Log
+                </h4>
+                <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                  Zero-Loss Engine Active
+                </span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3">
+                {(status?.metaWebhookLogs || []).length === 0 ? (
+                  <div className="text-center py-16 text-slate-400 text-xs">
+                    No webhook events recorded in this session. Trigger a test event on the left.
+                  </div>
+                ) : (
+                  (status?.metaWebhookLogs || []).map((log) => (
+                    <div key={log.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900">{log.leadName}</span>
+                        <span className="text-[11px] font-bold text-blue-600">{log.leadId}</span>
+                      </div>
+                      <div className="text-slate-500 text-[11px] flex justify-between">
+                        <span>Agent: <strong className="text-slate-700">{log.assignedTo}</strong></span>
+                        <span className="text-emerald-600 font-semibold">{log.qualityTier || 'Verified'}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex justify-between pt-0.5">
+                        <span>{log.status} ({log.latencyMs}ms)</span>
+                        <span>{new Date(log.timestamp).toLocaleTimeString('en-IN')}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: Token & Scopes Health */}
+        {activeTab === 'DIAGNOSTICS' && (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 lg:p-7 space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Activity size={22} />
+                  <Cpu size={20} />
                 </div>
                 <div>
-                  <h3 className="font-heading font-bold text-sm text-slate-900">
-                    Zero-Loss Protection Engine
+                  <h3 className="text-base font-heading font-bold text-slate-900">
+                    Meta Graph API v21.0 Token &amp; Permission Scopes
                   </h3>
-                  <p className="text-xs text-slate-500">Automated fallback for missing or malformed lead fields</p>
+                  <p className="text-xs text-slate-500">Live inspection of granted Facebook &amp; Instagram permissions</p>
                 </div>
               </div>
-
-              <div className="space-y-3 text-xs text-slate-600">
-                <p>
-                  When leads are submitted via Facebook or Instagram ads with missing phone numbers, foreign prefixes, or network drops, the Zero-Loss engine:
-                </p>
-                <ul className="space-y-2 font-medium">
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">1</span>
-                    <span>Saves all raw form field data directly to MongoDB without dropping the prospect.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">2</span>
-                    <span>Flags the record with an <strong className="text-rose-600 font-bold">[Urgent]</strong> tag for senior supervisor inspection.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">3</span>
-                    <span>Preserves the direct Facebook Business Inbox URL for one-tap direct messaging.</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-medium">Urgent Zero-Loss Queue</span>
-                <span className="font-bold text-slate-900 tabular-nums">{stats.urgentZeroLossLeads} Leads</span>
-              </div>
+              <button
+                onClick={fetchTokenHealth}
+                disabled={loadingHealth}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw size={13} className={loadingHealth ? 'animate-spin' : ''} />
+                <span>Re-Check Health</span>
+              </button>
             </div>
+
+            {loadingHealth ? (
+              <div className="py-12 flex flex-col items-center justify-center text-slate-400 gap-2">
+                <Loader2 size={24} className="animate-spin text-blue-600" />
+                <span className="text-xs">Querying Meta Graph API v21.0 debug endpoint...</span>
+              </div>
+            ) : tokenHealth ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Token Expiration</span>
+                    <span className="text-base font-bold text-emerald-700 block mt-1">{tokenHealth.expiresAt}</span>
+                    <span className="text-[11px] text-slate-500">{tokenHealth.tokenType}</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Target Facebook Page</span>
+                    <span className="text-base font-bold text-slate-900 block mt-1">{tokenHealth.pageName}</span>
+                    <span className="text-[11px] text-slate-500">Page ID: {tokenHealth.pageId}</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Webhook Subscription</span>
+                    <span className="text-base font-bold text-blue-700 block mt-1">leadgen Subscribed</span>
+                    <span className="text-[11px] text-slate-500">App ID: {tokenHealth.appId}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider px-1">
+                    Verified Meta Graph API Scopes
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {(tokenHealth.scopes || []).map((sc) => (
+                      <div key={sc.name} className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-mono font-bold text-slate-900 block">{sc.name}</span>
+                          <span className="text-[11px] text-slate-500">{sc.description || 'Active Permission'}</span>
+                        </div>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+                          <Check size={11} />
+                          <span>GRANTED</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
 
         {/* Real Field Mapping Modal */}
         {isMappingModalOpen && editingForm && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-scaleIn">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in duration-200">
               <div className="p-5 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h3 className="font-heading font-extrabold text-base text-slate-900">

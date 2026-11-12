@@ -5,6 +5,7 @@ import User from '../../../../lib/models/User';
 import { getOrInitSettings } from '../../../../lib/settings';
 import { purgeDashboardCache, purgeMetaCache } from '../../../../lib/cache';
 import { parseMetaLeadItem, sanitizePhone } from '../../../../lib/metaLeadParser';
+import { analyzeLeadQuality } from '../../../../lib/metaLeadQuality';
 
 export const dynamic = 'force-dynamic';
 
@@ -216,6 +217,25 @@ export async function POST(request) {
       }
     }
 
+    const qualityResult = analyzeLeadQuality({
+      name: extracted.name,
+      mobile: savedMobile,
+      email: extracted.email,
+      city: extracted.city,
+      state: extracted.state,
+      business_type: extracted.business_type,
+      product_interest: extracted.product_interest
+    });
+
+    if (qualityResult.tier === 'High Intent (VIP)') {
+      tags.push('High Intent');
+    }
+    if (qualityResult.isSpam) {
+      tags.push('Suspect Spam');
+    }
+
+    const priority = qualityResult.score >= 80 ? 'VIP' : (qualityResult.score >= 60 ? 'High' : 'Normal');
+
     const newLead = await Lead.create({
       name: extracted.name || `Meta Lead ${extracted.metaLeadId || ''}`.trim(),
       mobile: savedMobile,
@@ -227,12 +247,13 @@ export async function POST(request) {
       lead_source: resolvedSource,
       campaign_name: resolvedCampaign,
       status: chosenCaller ? 'Assigned' : 'Fresh Lead',
+      priority,
       assigned_to: chosenCaller ? chosenCaller._id : null,
       assigned_at: chosenCaller ? new Date() : null,
       tags,
       notes: extracted.notes || (zeroLossTriggered
-        ? `[URGENT] Unformatted Phone (${rawMobile}) saved via Zero-Loss Fallback.`
-        : `Captured via ${resolvedSource} Webhook${resolvedCampaign ? ` • Campaign="${resolvedCampaign}"` : ''}`),
+        ? `[URGENT] Unformatted Phone (${rawMobile}) saved via Zero-Loss Fallback. Intent Score: ${qualityResult.score}/100.`
+        : `Captured via ${resolvedSource} Webhook • Quality=${qualityResult.tier} (${qualityResult.score}/100)${resolvedCampaign ? ` • Campaign="${resolvedCampaign}"` : ''}`),
       ...(extracted.createdTime ? { createdAt: extracted.createdTime } : {})
     });
 
@@ -244,6 +265,28 @@ export async function POST(request) {
         settings.markModified('metaForms');
       }
     }
+
+    // Save Webhook Delivery Log
+    const latencyMs = Date.now() - startTime;
+    const webhookLogItem = {
+      id: `wh-${Date.now()}`,
+      timestamp: new Date(),
+      formId: extracted.formId || 'Direct',
+      leadId: newLead.lead_id,
+      leadName: newLead.name,
+      leadMobile: newLead.mobile,
+      qualityScore: qualityResult.score,
+      qualityTier: qualityResult.tier,
+      status: 'INGESTED_200_OK',
+      assignedTo: chosenCaller ? chosenCaller.name : 'Unassigned Pool',
+      latencyMs
+    };
+
+    const whLogs = settings.metaWebhookLogs || [];
+    whLogs.push(webhookLogItem);
+    if (whLogs.length > 50) whLogs.shift();
+    settings.metaWebhookLogs = whLogs;
+
     settings.metaConfig.lastSyncAt = new Date();
     settings.markModified('metaConfig');
     await settings.save();
@@ -255,11 +298,14 @@ export async function POST(request) {
       success: true,
       lead_id: newLead.lead_id,
       name: newLead.name,
+      mobile: newLead.mobile,
+      qualityScore: qualityResult.score,
+      qualityTier: qualityResult.tier,
       source: resolvedSource,
       campaignName: resolvedCampaign,
       assignedTo: chosenCaller ? chosenCaller.name : 'Unassigned',
       zeroLossTriggered,
-      latencyMs: Date.now() - startTime
+      latencyMs
     });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
