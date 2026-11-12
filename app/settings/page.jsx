@@ -154,10 +154,21 @@ export default function SettingsPage() {
       redirectUri = 'https://caller-website-monitoring.vercel.app/api/meta/oauth/callback';
     }
     const appId = status?.appId || '1007200718473332';
-    const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_ads,leads_retrieval';
-    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&scope=${encodeURIComponent(scopes)}&response_type=token,code&state=kisan_meta_oauth_${Date.now()}`;
+    const configId = status?.configId;
+
+    let authUrl = status?.authUrl;
+    if (!authUrl) {
+      if (configId) {
+        authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
+          redirectUri
+        )}&config_id=${encodeURIComponent(configId)}&response_type=code&state=kisan_meta_oauth_${Date.now()}`;
+      } else {
+        const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_ads,leads_retrieval';
+        authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
+          redirectUri
+        )}&scope=${encodeURIComponent(scopes)}&response_type=code&state=kisan_meta_oauth_${Date.now()}`;
+      }
+    }
 
     const width = 640;
     const height = 720;

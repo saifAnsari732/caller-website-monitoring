@@ -9,6 +9,7 @@ import { parseMetaLeadItem } from '../../../../lib/metaLeadParser';
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_APP_ID = process.env.META_APP_ID || '1007200718473332';
+const DEFAULT_APP_SECRET = process.env.META_APP_SECRET || '3417199d662e081419c470b832d1a49a';
 const DEFAULT_PAGE_ID = process.env.META_PAGE_ID || '933429549844450';
 const DEFAULT_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID || 'act_1796071777698019';
 const DEFAULT_PAGE_TOKEN = process.env.META_PAGE_ACCESS_TOKEN || '';
@@ -23,23 +24,32 @@ export async function GET(request) {
       redirectUri = 'https://caller-website-monitoring.vercel.app/api/meta/oauth/callback';
     }
 
-    const responseType = process.env.META_APP_SECRET ? 'code' : 'token';
-    const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_ads,leads_retrieval';
-    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${DEFAULT_APP_ID}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&scope=${encodeURIComponent(scopes)}&response_type=${responseType}&state=kisan_meta_oauth_${Date.now()}`;
+    await connectDB();
+    const settings = await SystemSetting.findOne({ key: 'global' }).lean();
+
+    const configId = searchParams.get('config_id') || process.env.META_CONFIG_ID || settings?.metaConfig?.configId || '2583186895497299';
+    const responseType = 'code';
+    let authUrl;
+    if (configId) {
+      authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${DEFAULT_APP_ID}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&config_id=${encodeURIComponent(configId)}&response_type=${responseType}&state=kisan_meta_oauth_${Date.now()}`;
+    } else {
+      const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_ads,leads_retrieval';
+      authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${DEFAULT_APP_ID}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&scope=${encodeURIComponent(scopes)}&response_type=${responseType}&state=kisan_meta_oauth_${Date.now()}`;
+    }
 
     if (action === 'popup' || action === 'authorize') {
       return NextResponse.redirect(authUrl);
     }
 
-    await connectDB();
-    const settings = await SystemSetting.findOne({ key: 'global' }).lean();
-
     return NextResponse.json({
       authUrl,
       appId: DEFAULT_APP_ID,
-      pageId: DEFAULT_PAGE_ID,
+      configId: configId || null,
+      pageId: settings?.metaConfig?.pageId || DEFAULT_PAGE_ID,
       connected: !!settings?.metaConfig?.connected,
       pageName: settings?.metaConfig?.pageName || 'Kisan Choice',
       lastSyncAt: settings?.metaConfig?.lastSyncAt

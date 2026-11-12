@@ -42,7 +42,7 @@ export async function GET(request) {
   try {
     await connectDB();
     const appId = process.env.META_APP_ID || '1007200718473332';
-    const appSecret = process.env.META_APP_SECRET || '';
+    const appSecret = process.env.META_APP_SECRET || '3417199d662e081419c470b832d1a49a';
     const redirectUri = `${origin}/api/meta/oauth/callback`;
 
     let settings = await SystemSetting.findOne({ key: 'global' });
