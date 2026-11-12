@@ -75,15 +75,23 @@ export async function GET(request) {
 
     const andConditions = [baseMetaFilter];
 
-    if (search) {
+    const cleanSearch = (search || '').trim();
+    if (cleanSearch) {
       andConditions.push({
         $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { mobile: { $regex: search, $options: 'i' } },
-          { lead_id: { $regex: search, $options: 'i' } },
-          { city: { $regex: search, $options: 'i' } },
-          { product_interest: { $regex: search, $options: 'i' } },
-          { campaign_name: { $regex: search, $options: 'i' } }
+          { name: { $regex: cleanSearch, $options: 'i' } },
+          { mobile: { $regex: cleanSearch, $options: 'i' } },
+          { email: { $regex: cleanSearch, $options: 'i' } },
+          { lead_id: { $regex: cleanSearch, $options: 'i' } },
+          { city: { $regex: cleanSearch, $options: 'i' } },
+          { state: { $regex: cleanSearch, $options: 'i' } },
+          { product_interest: { $regex: cleanSearch, $options: 'i' } },
+          { business_type: { $regex: cleanSearch, $options: 'i' } },
+          { join_as: { $regex: cleanSearch, $options: 'i' } },
+          { start_timeline: { $regex: cleanSearch, $options: 'i' } },
+          { campaign_name: { $regex: cleanSearch, $options: 'i' } },
+          { meta_lead_id: { $regex: cleanSearch, $options: 'i' } },
+          { notes: { $regex: cleanSearch, $options: 'i' } }
         ]
       });
     }
@@ -175,6 +183,11 @@ export async function GET(request) {
       },
       telecallers,
       metaForms: settings.metaForms || []
+    }, {
+      headers: {
+        'Cache-Control': 'private, s-maxage=10, stale-while-revalidate=59',
+        'X-CRM-Source': 'MongoDB-Indexed'
+      }
     });
   } catch (error) {
     console.error('Meta leads fetch error:', error);

@@ -65,15 +65,24 @@ export async function GET(request) {
     const skip = (page - 1) * limit;
 
     const query = { ...leadFilter };
-    if (search) {
+    const cleanTerm = search.trim();
+    if (cleanTerm) {
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { mobile: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { lead_id: { $regex: search, $options: 'i' } },
-        { city: { $regex: search, $options: 'i' } },
-        { product_interest: { $regex: search, $options: 'i' } },
-        { campaign_name: { $regex: search, $options: 'i' } }
+        { name: { $regex: cleanTerm, $options: 'i' } },
+        { mobile: { $regex: cleanTerm, $options: 'i' } },
+        { email: { $regex: cleanTerm, $options: 'i' } },
+        { lead_id: { $regex: cleanTerm, $options: 'i' } },
+        { city: { $regex: cleanTerm, $options: 'i' } },
+        { state: { $regex: cleanTerm, $options: 'i' } },
+        { campaign_name: { $regex: cleanTerm, $options: 'i' } },
+        { product_interest: { $regex: cleanTerm, $options: 'i' } },
+        { business_type: { $regex: cleanTerm, $options: 'i' } },
+        { join_as: { $regex: cleanTerm, $options: 'i' } },
+        { start_timeline: { $regex: cleanTerm, $options: 'i' } },
+        { meta_lead_id: { $regex: cleanTerm, $options: 'i' } },
+        { lead_status: { $regex: cleanTerm, $options: 'i' } },
+        { notes: { $regex: cleanTerm, $options: 'i' } },
+        { status: { $regex: cleanTerm, $options: 'i' } }
       ];
     }
     if (status && status !== 'ALL') query.status = status;
@@ -132,6 +141,11 @@ export async function GET(request) {
       page,
       limit,
       totalPages: Math.ceil(total / limit)
+    }, {
+      headers: {
+        'Cache-Control': 'private, s-maxage=10, stale-while-revalidate=59',
+        'X-CRM-Source': 'MongoDB-Indexed'
+      }
     });
   } catch (error) {
     console.error('Leads GET error:', error);
@@ -210,9 +224,14 @@ export async function POST(request) {
       state: (state || '').trim(),
       business_type: (business_type || '').trim(),
       product_interest: (product_interest || '').trim(),
+      join_as: (body.join_as || business_type || '').trim(),
+      start_timeline: (body.start_timeline || product_interest || '').trim(),
+      deal_amount: Number(body.deal_amount) || 0,
+      follow_up_time: body.follow_up_time ? new Date(body.follow_up_time) : null,
+      lead_status: body.lead_status || 'In-Progress',
       lead_source: lead_source || 'Admin Manual Entry',
       campaign_name: (campaign_name || '').trim(),
-      status: targetCallerId ? 'Assigned' : 'Fresh Lead',
+      status: targetCallerId ? 'Assigned' : 'Fresh Inquiry',
       assigned_to: targetCallerId,
       assigned_at: targetCallerId ? new Date() : null,
       notes: notes || ''
