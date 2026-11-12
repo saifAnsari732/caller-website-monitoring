@@ -34,8 +34,8 @@ export default function SystemHealthPage() {
       const time = new Date().toLocaleTimeString();
       if (res.ok) {
         const line1 = `[${time}] Meta Graph API v21.0 Heartbeat -> 200 OK (${elapsed}ms latency)`;
-        const line2 = `[${time}] Page: "${data.pageName}" (ID: ${data.pageId}) • Token Status: ${data.hasToken ? 'VALID' : 'MISSING'}`;
-        const line3 = `[${time}] Total Meta Leads Ingested: ${data.stats?.totalMetaLeads || 0} • Active Forms: ${data.metaForms?.length || 0}`;
+        const line2 = `[${time}] Page: "${data.pageName}" (ID: ${data.pageId}) â€¢ Token Status: ${data.hasToken ? 'VALID' : 'MISSING'}`;
+        const line3 = `[${time}] Total Meta Leads Ingested: ${data.stats?.totalMetaLeads || 0} â€¢ Active Forms: ${data.metaForms?.length || 0}`;
         setTestLogs(prev => [line3, line2, line1, ...prev]);
       } else {
         setTestLogs(prev => [`[${time}] ERROR: ${data.error}`, ...prev]);
@@ -62,7 +62,7 @@ export default function SystemHealthPage() {
       const time = new Date().toLocaleTimeString();
 
       if (res.ok) {
-        const line = `[${time}] Webhook Handshake Verification -> 200 OK (${elapsed}ms) • Challenge verified`;
+        const line = `[${time}] Webhook Handshake Verification -> 200 OK (${elapsed}ms) â€¢ Challenge verified`;
         setTestLogs(prev => [line, ...prev]);
       } else {
         setTestLogs(prev => [`[${time}] Webhook Handshake Error: HTTP ${res.status}`, ...prev]);
@@ -84,7 +84,7 @@ export default function SystemHealthPage() {
       <main className="px-5 lg:px-7 py-6 space-y-6 flex-1 w-full max-w-none">
         {/* Status Indicators */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
             <div className="flex items-center gap-3 mb-2">
               <CheckCircle2 className="text-emerald-500" size={20} />
               <h4 className="font-heading font-bold text-slate-900 text-sm">Meta Webhook & OAuth Status</h4>
@@ -97,7 +97,7 @@ export default function SystemHealthPage() {
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
             <div className="flex items-center gap-3 mb-2">
               <ShieldCheck className="text-blue-600" size={20} />
               <h4 className="font-heading font-bold text-slate-900 text-sm">Zero-Loss Phone Protection</h4>
@@ -107,7 +107,7 @@ export default function SystemHealthPage() {
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
             <div className="flex items-center gap-3 mb-2">
               <Activity className="text-blue-600" size={20} />
               <h4 className="font-heading font-bold text-slate-900 text-sm">Live Ingestion Latency</h4>
@@ -120,7 +120,7 @@ export default function SystemHealthPage() {
 
         {/* Real Diagnostics Control & Terminal Output */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-5">
             <div>
               <h3 className="font-heading font-bold text-base text-slate-900 flex items-center gap-2">
                 <Zap size={18} className="text-blue-600" /> Live Meta API Diagnostics Benchmark
@@ -170,7 +170,7 @@ export default function SystemHealthPage() {
           </div>
 
           {/* Console Output */}
-          <div className="bg-slate-950 text-emerald-400 p-6 rounded-3xl font-mono text-xs shadow-xl flex flex-col h-[380px]">
+          <div className="bg-slate-950 text-emerald-400 p-6 rounded-2xl font-mono text-xs shadow-xl flex flex-col h-[380px]">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3 text-slate-400">
               <span className="flex items-center gap-2 font-bold"><Terminal size={14} /> Telemetry & Benchmark Logs</span>
               <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">LIVE ATLAS</span>

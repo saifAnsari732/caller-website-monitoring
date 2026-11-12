@@ -243,7 +243,7 @@ export default function FollowupsPage() {
                       <td className="py-4 px-6">
                         <p className="font-semibold text-slate-900 text-sm">{item.client}</p>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          {item.leadCode} • +91 {item.mobile} • {item.city}
+                          {item.leadCode} â€¢ +91 {item.mobile} â€¢ {item.city}
                         </p>
                       </td>
                       <td className="py-4 px-6 font-semibold text-blue-600 whitespace-nowrap">{item.agent}</td>
@@ -295,7 +295,7 @@ export default function FollowupsPage() {
       {/* Schedule Follow-up Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 relative">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 relative">
             <button
               onClick={() => setShowAddModal(false)}
               className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer"
@@ -316,7 +316,7 @@ export default function FollowupsPage() {
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
                   {leads.map(l => (
-                    <option key={l.id} value={l.id}>{l.lead_id} — {l.name}</option>
+                    <option key={l.id} value={l.id}>{l.lead_id} â€” {l.name}</option>
                   ))}
                 </select>
               </div>

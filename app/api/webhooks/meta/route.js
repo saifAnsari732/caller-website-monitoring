@@ -76,7 +76,10 @@ export async function POST(request) {
 
             const matchedForm = (settings.metaForms || []).find(f => f.formId === extracted.formId);
 
-            if (extracted.metaLeadId && token) {
+            const isSimulated = String(extracted.metaLeadId).startsWith('SIM-');
+            let parsedFromGraph = false;
+
+            if (extracted.metaLeadId && !isSimulated && token) {
               try {
                 const leadRes = await fetch(
                   `https://graph.facebook.com/v21.0/${extracted.metaLeadId}?fields=id,created_time,ad_name,campaign_name,form_id,field_data&access_token=${encodeURIComponent(token)}`,
@@ -95,11 +98,14 @@ export async function POST(request) {
                   extracted.campaign_name = parsed.campaignName || extracted.campaign_name;
                   extracted.notes = parsed.notes;
                   extracted.createdTime = parsed.createdTime;
+                  parsedFromGraph = true;
                 }
               } catch (fetchErr) {
                 console.warn('Webhook leadgen fetch warning:', fetchErr.message);
               }
-            } else if (Array.isArray(val.field_data)) {
+            }
+
+            if (!parsedFromGraph && Array.isArray(val.field_data)) {
               const parsed = parseMetaLeadItem(
                 { id: extracted.metaLeadId, field_data: val.field_data, campaign_name: val.campaign_name },
                 matchedForm?.formName || ''
@@ -111,6 +117,7 @@ export async function POST(request) {
               extracted.state = parsed.state || extracted.state;
               extracted.business_type = parsed.businessType || extracted.business_type;
               extracted.product_interest = parsed.productInterest || extracted.product_interest;
+              extracted.campaign_name = parsed.campaignName || val.campaign_name || extracted.campaign_name;
               extracted.notes = parsed.notes;
             }
           }

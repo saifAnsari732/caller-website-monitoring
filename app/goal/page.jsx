@@ -123,7 +123,7 @@ export default function GoalsPage() {
 
         {/* Overview KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-[11px] font-bold uppercase tracking-wider">Active Campaigns</span>
               <Target size={16} className="text-blue-600" />
@@ -134,7 +134,7 @@ export default function GoalsPage() {
             <div className="text-[11px] text-slate-500 mt-1 font-medium">Meta Ad Account: act_1796071777698019</div>
           </div>
 
-          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-[11px] font-bold uppercase tracking-wider">Total Leads Acquired</span>
               <Users size={16} className="text-emerald-600" />
@@ -145,18 +145,18 @@ export default function GoalsPage() {
             <div className="text-[11px] text-emerald-600 mt-1 font-medium">Synced from live Meta forms</div>
           </div>
 
-          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-[11px] font-bold uppercase tracking-wider">Average Cost Per Lead</span>
               <DollarSign size={16} className="text-indigo-600" />
             </div>
             <div className="text-2xl font-heading font-extrabold text-indigo-700 tabular-nums">
-              {avgCPL !== null ? `₹${avgCPL}` : '—'}
+              {avgCPL !== null ? `â‚¹${avgCPL}` : 'â€”'}
             </div>
             <div className="text-[11px] text-indigo-600 mt-1 font-medium">Computed from live Meta spend & leads</div>
           </div>
 
-          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-[11px] font-bold uppercase tracking-wider">SLA Response Target</span>
               <Clock size={16} className="text-amber-600" />
@@ -169,7 +169,7 @@ export default function GoalsPage() {
         </div>
 
         {/* Campaign Goals Matrix Table */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-xs">
+        <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h3 className="font-heading font-bold text-sm text-slate-900 flex items-center gap-2">
@@ -184,9 +184,9 @@ export default function GoalsPage() {
                 setRefreshing(true);
                 fetchCampaignGoals();
               }}
-              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 border border-blue-200/80 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
             >
-              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={refreshing ? 'animate-spin text-blue-600' : 'text-slate-500'} />
               <span>Refresh Goals</span>
             </button>
           </div>
@@ -265,7 +265,7 @@ export default function GoalsPage() {
                         </td>
 
                         <td className="py-4 px-4 text-right font-medium text-slate-700 tabular-nums">
-                          ₹{c.spend ? Number(c.spend).toFixed(2) : '0.00'}
+                          â‚¹{c.spend ? Number(c.spend).toFixed(2) : '0.00'}
                         </td>
 
                         <td className="py-4 px-4 text-center font-heading font-extrabold text-slate-900 tabular-nums text-sm">
@@ -279,10 +279,10 @@ export default function GoalsPage() {
                                 isHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
                               }`}
                             >
-                              ₹{actualCPL.toFixed(1)}
+                              â‚¹{actualCPL.toFixed(1)}
                             </span>
                           ) : (
-                            <span className="text-slate-400 font-semibold">—</span>
+                            <span className="text-slate-400 font-semibold">â€”</span>
                           )}
                         </td>
 
@@ -293,7 +293,7 @@ export default function GoalsPage() {
                         <td className="py-4 px-5 text-right">
                           <button
                             onClick={() => handleOpenEditGoal(c)}
-                            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-sm shadow-blue-500/20 border border-blue-400/30 flex items-center gap-1.5 ml-auto transition-all active:scale-95 cursor-pointer"
+                            className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs flex items-center gap-1.5 ml-auto transition-colors cursor-pointer"
                           >
                             <Edit3 size={12} />
                             <span>Set Goal</span>
@@ -311,7 +311,7 @@ export default function GoalsPage() {
         {/* Goal Edit Modal */}
         {editingGoal && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-scaleIn">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-scaleIn">
               <div className="p-5 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h3 className="font-heading font-extrabold text-base text-slate-900 flex items-center gap-2">
@@ -340,7 +340,7 @@ export default function GoalsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Target CPL (₹)</label>
+                    <label className="block font-semibold text-slate-700 mb-1">Target CPL (â‚¹)</label>
                     <input
                       type="number"
                       min="0"
@@ -353,7 +353,7 @@ export default function GoalsPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Monthly Budget Goal (₹)</label>
+                    <label className="block font-semibold text-slate-700 mb-1">Monthly Budget Goal (â‚¹)</label>
                     <input
                       type="number"
                       min="0"
@@ -396,7 +396,7 @@ export default function GoalsPage() {
                   <button
                     type="submit"
                     disabled={savingGoal}
-                    className="px-5 py-2.5 rounded-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-md shadow-emerald-500/25 border border-emerald-400/30 flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50 text-xs"
+                    className="px-5 py-2.5 rounded-xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 text-xs"
                   >
                     {savingGoal ? <Loader2 size={13} className="animate-spin text-white" /> : <Save size={13} />}
                     <span>Save Goal</span>

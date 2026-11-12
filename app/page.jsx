@@ -4,7 +4,6 @@ import Header from '../components/Header';
 import Link from 'next/link';
 import {
   Users,
-  PhoneCall,
   Phone,
   MessageCircle,
   TrendingUp,
@@ -12,6 +11,7 @@ import {
   Zap,
   ShieldAlert,
   ChevronRight,
+  ChevronLeft,
   UserCheck,
   Plus,
   Loader2,
@@ -29,12 +29,16 @@ import {
   SlidersHorizontal,
   Layers,
   ChevronDown,
-  ArrowUpDown,
-  Share2,
-  Star
+  MoreVertical,
+  Edit3,
+  Trash2,
+  Eye,
+  Check,
+  UserPlus
 } from 'lucide-react';
 
 const STATUS_STYLES = {
+  'Fresh Inquiry': 'bg-sky-50 text-sky-700 border-sky-200',
   'Fresh Lead': 'bg-sky-50 text-sky-700 border-sky-200',
   'Assigned': 'bg-blue-50 text-blue-700 border-blue-200',
   'Connected': 'bg-teal-50 text-teal-700 border-teal-200',
@@ -43,9 +47,6 @@ const STATUS_STYLES = {
   'Interested': 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold',
   'Distributor Interested': 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold',
   'Trader Interested': 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold',
-  'DSS Interested': 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold',
-  'RSS Interested': 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold',
-  'SS Interested': 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold',
   'Closed': 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold',
   'Not Connected': 'bg-slate-100 text-slate-600 border-slate-200',
   'Wrong Number': 'bg-rose-50 text-rose-700 border-rose-200',
@@ -53,6 +54,7 @@ const STATUS_STYLES = {
 };
 
 const ALL_STATUS_OPTIONS = [
+  'Fresh Inquiry',
   'Fresh Lead',
   'Assigned',
   'Interested',
@@ -67,6 +69,23 @@ const ALL_STATUS_OPTIONS = [
   'Rejected'
 ];
 
+const TAG_OPTIONS = ['Hot', 'Warm', 'Cold', 'VIP'];
+
+function formatLeadDate(dateVal) {
+  if (!dateVal) return '—';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '—';
+  const day = d.getDate();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
+}
+
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
@@ -76,44 +95,71 @@ export default function Dashboard() {
   const [actionBanner, setActionBanner] = useState(null);
   const [activeTab, setActiveTab] = useState('LEADS'); // 'LEADS' | 'CALLERS' | 'CAMPAIGNS' | 'SLA'
 
-  // Dashboard Leads Filter States
+  // Dashboard Leads Table States (Matching Screenshot Layout & Server Pagination for Total Leads)
+  const [workbenchLeads, setWorkbenchLeads] = useState([]);
+  const [workbenchLoading, setWorkbenchLoading] = useState(true);
+  const [totalLeadsCount, setTotalLeadsCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [totalPages, setTotalPages] = useState(1);
+  const [campaignOptions, setCampaignOptions] = useState([]);
+  const [usersList, setUsersList] = useState([]);
+
+  // Multi-Filter States
+  const [dateFilter, setDateFilter] = useState('ALL');
+  const [callerFilter, setCallerFilter] = useState('ALL');
+  const [stageFilter, setStageFilter] = useState('ALL');
+  const [campaignFilter, setCampaignFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('');
-  const [campaignFilter, setCampaignFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [callerFilter, setCallerFilter] = useState('');
-  const [quickPreset, setQuickPreset] = useState('ALL'); // 'ALL' | 'META' | 'FRESH' | 'UNASSIGNED' | 'SLA' | 'HOT'
 
   // Bulk Selection & Assignment States
   const [selectedLeadIds, setSelectedLeadIds] = useState([]);
   const [bulkCallerId, setBulkCallerId] = useState('ROUND_ROBIN');
   const [bulkAssigning, setBulkAssigning] = useState(false);
-  const [inlineUpdatingId, setInlineUpdatingId] = useState(null);
+  const [bulkStatus, setBulkStatus] = useState('');
+  const [bulkUpdatingStatus, setBulkUpdatingStatus] = useState(false);
 
-  // Modals for 1-Click Actions
+  // Modals for Actions & Quick Edit
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
-  const [showDialerModal, setShowDialerModal] = useState(false);
-  const [dialTargetLead, setDialTargetLead] = useState(null);
+  const [editingLead, setEditingLead] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState(null);
+
+  // Drawer: 360° Inspector
+  const [inspectorLeadId, setInspectorLeadId] = useState(null);
+  const [inspectorData, setInspectorData] = useState(null);
+  const [loadingInspector, setLoadingInspector] = useState(false);
+
+  // Column Visibility
+  const [showColMenu, setShowColMenu] = useState(false);
+  const [columns, setColumns] = useState({
+    no: true,
+    name: true,
+    number: true,
+    email: true,
+    campaign: true,
+    creationDate: true,
+    updatedAt: true,
+    stage: true,
+    tag: true,
+    userAssigned: true,
+    action: true
+  });
 
   // New Lead Form State
   const [newLeadForm, setNewLeadForm] = useState({
     name: '',
     mobile: '',
+    email: '',
     city: '',
+    campaign_name: '',
     business_type: '',
-    product_interest: ''
+    product_interest: '',
+    assigned_to: ''
   });
   const [savingLead, setSavingLead] = useState(false);
 
-  // Dialer Form State
-  const [dialerForm, setDialerForm] = useState({
-    callerId: '',
-    duration: 120,
-    status: 'Interested',
-    notes: ''
-  });
-  const [savingCall, setSavingCall] = useState(false);
-
+  // Fetch Dashboard Stats (KPIs, Teams, Campaigns)
   const fetchDashboard = useCallback(async () => {
     try {
       const [dashRes, hubRes] = await Promise.all([
@@ -133,15 +179,76 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Fetch Workbench Leads (All total leads with server-side pagination & multi-filters)
+  const fetchWorkbenchLeads = useCallback(async () => {
+    setWorkbenchLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      if (stageFilter && stageFilter !== 'ALL') params.set('status', stageFilter);
+      if (callerFilter && callerFilter !== 'ALL') params.set('callerId', callerFilter);
+      if (campaignFilter && campaignFilter !== 'ALL') params.set('campaign', campaignFilter);
+      if (dateFilter && dateFilter !== 'ALL') params.set('dateRange', dateFilter);
+
+      const res = await fetch(`/api/leads?${params.toString()}`);
+      const json = await res.json();
+      if (json.leads) setWorkbenchLeads(json.leads);
+      if (json.total !== undefined) setTotalLeadsCount(json.total);
+      if (json.totalPages !== undefined) setTotalPages(json.totalPages);
+      if (json.campaigns) setCampaignOptions(json.campaigns);
+      if (json.users) setUsersList(json.users);
+    } catch (err) {
+      console.error('Fetch workbench leads error:', err);
+    } finally {
+      setWorkbenchLoading(false);
+    }
+  }, [page, limit, searchQuery, stageFilter, callerFilter, campaignFilter, dateFilter]);
+
   useEffect(() => {
     fetchDashboard();
-    const timer = setInterval(fetchDashboard, 15000);
+    const timer = setInterval(fetchDashboard, 20000);
     return () => clearInterval(timer);
   }, [fetchDashboard]);
+
+  useEffect(() => {
+    fetchWorkbenchLeads();
+  }, [fetchWorkbenchLeads]);
+
+  // Close menus on outside click
+  useEffect(() => {
+    const handleOutside = () => {
+      setActiveMenuId(null);
+      setShowColMenu(false);
+    };
+    window.addEventListener('click', handleOutside);
+    return () => window.removeEventListener('click', handleOutside);
+  }, []);
 
   const showToast = (msg) => {
     setActionBanner(msg);
     setTimeout(() => setActionBanner(null), 5000);
+  };
+
+  // Active filter count for badge
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (dateFilter !== 'ALL') count++;
+    if (callerFilter !== 'ALL') count++;
+    if (stageFilter !== 'ALL') count++;
+    if (campaignFilter !== 'ALL') count++;
+    if (searchQuery.trim() !== '') count++;
+    return count;
+  }, [dateFilter, callerFilter, stageFilter, campaignFilter, searchQuery]);
+
+  const resetAllFilters = () => {
+    setDateFilter('ALL');
+    setCallerFilter('ALL');
+    setStageFilter('ALL');
+    setCampaignFilter('ALL');
+    setSearchQuery('');
+    setPage(1);
   };
 
   const handleAutoRedistributeSLA = async () => {
@@ -156,6 +263,7 @@ export default function Dashboard() {
       if (json.success) {
         showToast(`Successfully re-balanced ${json.redistributedCount} uncontacted leads across active telecallers.`);
         fetchDashboard();
+        fetchWorkbenchLeads();
       }
     } catch (e) {
       console.error(e);
@@ -174,8 +282,9 @@ export default function Dashboard() {
       });
       const json = await res.json();
       if (json.success) {
-        showToast(`Meta Sync: Ingested ${json.syncedCount} new leads from Meta Ads & assigned to telecallers.`);
+        showToast(`Meta Sync: Ingested ${json.syncedCount} new leads from Meta Ads.`);
         fetchDashboard();
+        fetchWorkbenchLeads();
       }
     } catch (e) {
       console.error(e);
@@ -203,12 +312,16 @@ export default function Dashboard() {
         setNewLeadForm({
           name: '',
           mobile: '',
+          email: '',
           city: '',
+          campaign_name: '',
           business_type: '',
-          product_interest: ''
+          product_interest: '',
+          assigned_to: ''
         });
         showToast(`Lead created successfully! Assigned to: ${json.lead?.assigned_to?.name || 'Telecaller'}`);
         fetchDashboard();
+        fetchWorkbenchLeads();
       }
     } catch (err) {
       console.error(err);
@@ -217,85 +330,31 @@ export default function Dashboard() {
     }
   };
 
-  const openDialerForLead = (lead) => {
-    setDialTargetLead(lead);
-    setDialerForm({
-      callerId: lead.assignedToId || data?.team?.[0]?.id || '',
-      duration: 120,
-      status: 'Interested',
-      notes: ''
-    });
-    setShowDialerModal(true);
-  };
-
-  const handleSaveCall = async (e) => {
-    e.preventDefault();
-    if (!dialTargetLead?.id || !dialerForm.callerId) return;
-    setSavingCall(true);
+  // Bulk status update for selected leads
+  const handleBulkStatusUpdate = async () => {
+    if (!bulkStatus || selectedLeadIds.length === 0) return;
+    setBulkUpdatingStatus(true);
     try {
-      const res = await fetch('/api/calls', {
-        method: 'POST',
+      const res = await fetch('/api/leads', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          leadId: dialTargetLead.id,
-          callerId: dialerForm.callerId,
-          duration: Number(dialerForm.duration) || 60,
-          status: dialerForm.status,
-          notes: dialerForm.notes
+          leadIds: selectedLeadIds,
+          status: bulkStatus
         })
       });
       const json = await res.json();
       if (json.success) {
-        setShowDialerModal(false);
-        showToast(`Call logged: ${dialTargetLead.name} marked as "${dialerForm.status}"`);
+        showToast(`Updated status of ${selectedLeadIds.length} leads to "${bulkStatus}"!`);
+        setSelectedLeadIds([]);
+        setBulkStatus('');
         fetchDashboard();
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSavingCall(false);
-    }
-  };
-
-  // Inline assignment from the Dashboard table
-  const handleInlineAssign = async (leadId, userId) => {
-    setInlineUpdatingId(leadId);
-    try {
-      const res = await fetch('/api/leads', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId, assigned_to: userId })
-      });
-      const json = await res.json();
-      if (json.success) {
-        showToast(`Lead successfully assigned to ${json.lead?.assigned_to?.name || 'Unassigned'}!`);
-        fetchDashboard();
+        fetchWorkbenchLeads();
       }
     } catch (e) {
       console.error(e);
     } finally {
-      setInlineUpdatingId(null);
-    }
-  };
-
-  // Inline status change from the Dashboard table
-  const handleInlineStatus = async (leadId, newStatus) => {
-    setInlineUpdatingId(leadId);
-    try {
-      const res = await fetch('/api/leads', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId, status: newStatus })
-      });
-      const json = await res.json();
-      if (json.success) {
-        showToast(`Status updated to "${newStatus}"!`);
-        fetchDashboard();
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setInlineUpdatingId(null);
+      setBulkUpdatingStatus(false);
     }
   };
 
@@ -321,12 +380,100 @@ export default function Dashboard() {
         setSelectedLeadIds([]);
         setBulkCallerId('ROUND_ROBIN');
         fetchDashboard();
+        fetchWorkbenchLeads();
       }
     } catch (e) {
       console.error(e);
     } finally {
       setBulkAssigning(false);
     }
+  };
+
+  // Save Quick Edit for a lead
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingLead?._id && !editingLead?.id) return;
+    setSavingEdit(true);
+    try {
+      const targetId = editingLead._id || editingLead.id;
+      const res = await fetch('/api/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: targetId,
+          name: editingLead.name,
+          mobile: editingLead.mobile,
+          email: editingLead.email,
+          campaign_name: editingLead.campaign_name,
+          status: editingLead.status,
+          priority: editingLead.priority,
+          city: editingLead.city,
+          state: editingLead.state,
+          assigned_to: editingLead.assigned_to?._id || editingLead.assigned_to || editingLead.assignedToId || null,
+          notes: editingLead.notes
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Lead ${editingLead.name} updated successfully!`);
+        setEditingLead(null);
+        fetchDashboard();
+        fetchWorkbenchLeads();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Delete lead
+  const handleDeleteLead = async (leadId, leadName) => {
+    if (!window.confirm(`Are you sure you want to delete lead "${leadName}"?`)) return;
+    try {
+      const res = await fetch(`/api/leads?id=${leadId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Lead "${leadName}" removed.`);
+        fetchDashboard();
+        fetchWorkbenchLeads();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Timeline drawer
+  const openInspector = async (leadId) => {
+    setInspectorLeadId(leadId);
+    setLoadingInspector(true);
+    try {
+      const res = await fetch(`/api/leads?detailId=${leadId}`);
+      const data = await res.json();
+      setInspectorData(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingInspector(false);
+    }
+  };
+
+  // Export CSV
+  const handleExportCSV = () => {
+    const header = 'No,LeadID,Name,Number,Email,CampaignName,CreationDate,UpdatedAt,LeadStage,Tag,UserAssigned';
+    const rows = workbenchLeads.map((l, idx) => {
+      const no = (page - 1) * limit + idx + 1;
+      const tag = l.priority === 'High' || l.priority === 'VIP' ? 'Hot' : 'Hot';
+      const assignedName = l.assigned_to?.name || l.assignedTo || 'Unassigned';
+      return `"${no}","${l.lead_id || ''}","${l.name || ''}","${l.mobile || ''}","${l.email || ''}","${l.campaign_name || ''}","${formatLeadDate(l.createdAt)}","${formatLeadDate(l.updatedAt || l.createdAt)}","${l.status || 'Fresh Inquiry'}","${tag}","${assignedName}"`;
+    });
+    const csvContent = 'data:text/csv;charset=utf-8,' + [header, ...rows].join('\n');
+    const link = document.createElement('a');
+    link.setAttribute('href', encodeURI(csvContent));
+    link.setAttribute('download', `Dashboard_Leads_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const kpis = data?.kpis || {
@@ -351,198 +498,53 @@ export default function Dashboard() {
   const rawRecentLeads = data?.recentLeads || [];
   const slaBreachLeads = data?.slaBreachLeads || [];
 
-  // Available campaigns & sources for dropdown filters
-  const campaignOptions = useMemo(() => {
-    const set = new Set();
-    if (data?.availableCampaigns) {
-      data.availableCampaigns.forEach(c => set.add(c));
-    }
-    campaigns.forEach(c => set.add(c.name));
-    rawRecentLeads.forEach(l => {
-      if (l.campaign_name) set.add(l.campaign_name);
-    });
-    return Array.from(set).filter(Boolean);
-  }, [data?.availableCampaigns, campaigns, rawRecentLeads]);
+  const startIndex = totalLeadsCount === 0 ? 0 : (page - 1) * limit + 1;
+  const endIndex = Math.min(page * limit, totalLeadsCount);
 
-  const sourceOptions = useMemo(() => {
-    const set = new Set([
-      'Facebook Meta Lead Ads',
-      'Direct Phone / Manual CRM Entry'
-    ]);
-    if (data?.availableSources) {
-      data.availableSources.forEach(s => set.add(s));
-    }
-    rawRecentLeads.forEach(l => {
-      if (l.lead_source) set.add(l.lead_source);
-    });
-    return Array.from(set).filter(Boolean);
-  }, [data?.availableSources, rawRecentLeads]);
+  // Selection state on current page
+  const pageIds = workbenchLeads.map(l => l._id || l.id);
+  const isAllPageSelected = pageIds.length > 0 && pageIds.every(id => selectedLeadIds.includes(id));
 
-  // Compute preset counts
-  const presetCounts = useMemo(() => {
-    return {
-      ALL: rawRecentLeads.length,
-      META: rawRecentLeads.filter(l => {
-        const s = (l.lead_source || '').toLowerCase();
-        return s.includes('meta') || s.includes('facebook') || s.includes('instagram');
-      }).length,
-      FRESH: rawRecentLeads.filter(l => ['Fresh Lead', 'Assigned'].includes(l.status)).length,
-      UNASSIGNED: rawRecentLeads.filter(l => !l.assignedTo || l.assignedTo === 'Unassigned').length,
-      SLA: rawRecentLeads.filter(l => l.call_attempts === 0 && ['Fresh Lead', 'Assigned'].includes(l.status)).length,
-      HOT: rawRecentLeads.filter(l => ['Interested', 'Distributor Interested', 'Trader Interested'].includes(l.status)).length
-    };
-  }, [rawRecentLeads]);
-
-  // High-performance In-Memory Reactive Filtering
-  const filteredLeads = useMemo(() => {
-    return rawRecentLeads.filter(lead => {
-      // 1. Quick Presets
-      if (quickPreset === 'META') {
-        const s = (lead.lead_source || '').toLowerCase();
-        if (!s.includes('meta') && !s.includes('facebook') && !s.includes('instagram')) return false;
-      } else if (quickPreset === 'FRESH') {
-        if (!['Fresh Lead', 'Assigned'].includes(lead.status)) return false;
-      } else if (quickPreset === 'UNASSIGNED') {
-        if (lead.assignedTo && lead.assignedTo !== 'Unassigned') return false;
-      } else if (quickPreset === 'SLA') {
-        if (lead.call_attempts > 0 || !['Fresh Lead', 'Assigned'].includes(lead.status)) return false;
-      } else if (quickPreset === 'HOT') {
-        if (!['Interested', 'Distributor Interested', 'Trader Interested'].includes(lead.status)) return false;
-      }
-
-      // 2. Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchName = (lead.name || '').toLowerCase().includes(q);
-        const matchPhone = (lead.mobile || '').includes(q);
-        const matchId = (lead.lead_id || '').toLowerCase().includes(q);
-        const matchCity = (lead.city || '').toLowerCase().includes(q);
-        const matchCamp = (lead.campaign_name || '').toLowerCase().includes(q);
-        const matchProd = (lead.product_interest || '').toLowerCase().includes(q);
-        if (!matchName && !matchPhone && !matchId && !matchCity && !matchCamp && !matchProd) return false;
-      }
-
-      // 3. Source Filter
-      if (sourceFilter) {
-        if (!(lead.lead_source || '').toLowerCase().includes(sourceFilter.toLowerCase())) return false;
-      }
-
-      // 4. Campaign Filter
-      if (campaignFilter) {
-        if (lead.campaign_name !== campaignFilter && !(lead.lead_source || '').includes(campaignFilter)) return false;
-      }
-
-      // 5. Status Filter
-      if (statusFilter) {
-        if (lead.status !== statusFilter) return false;
-      }
-
-      // 6. Caller Filter
-      if (callerFilter) {
-        if (callerFilter === 'UNASSIGNED') {
-          if (lead.assignedTo && lead.assignedTo !== 'Unassigned') return false;
-        } else {
-          if (lead.assignedToId !== callerFilter && lead.assignedTo !== callerFilter) return false;
-        }
-      }
-
-      return true;
-    });
-  }, [rawRecentLeads, quickPreset, searchQuery, sourceFilter, campaignFilter, statusFilter, callerFilter]);
-
-  // Bulk Selection Toggles
-  const isAllFilteredSelected = filteredLeads.length > 0 && filteredLeads.every(l => selectedLeadIds.includes(l.id));
-
-  const toggleSelectAllFiltered = () => {
-    if (isAllFilteredSelected) {
-      const filteredIds = new Set(filteredLeads.map(l => l.id));
-      setSelectedLeadIds(selectedLeadIds.filter(id => !filteredIds.has(id)));
+  const toggleSelectAllPage = () => {
+    if (isAllPageSelected) {
+      const removeSet = new Set(pageIds);
+      setSelectedLeadIds(selectedLeadIds.filter(id => !removeSet.has(id)));
     } else {
-      const combined = new Set([...selectedLeadIds, ...filteredLeads.map(l => l.id)]);
+      const combined = new Set([...selectedLeadIds, ...pageIds]);
       setSelectedLeadIds(Array.from(combined));
     }
   };
 
-  const toggleLeadSelection = (id) => {
-    setSelectedLeadIds(prev =>
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  };
-
-  const resetAllFilters = () => {
-    setSearchQuery('');
-    setSourceFilter('');
-    setCampaignFilter('');
-    setStatusFilter('');
-    setCallerFilter('');
-    setQuickPreset('ALL');
-  };
-
-  const isAnyFilterActive = searchQuery || sourceFilter || campaignFilter || statusFilter || callerFilter || quickPreset !== 'ALL';
-
-  // Helper to format lead capture timestamp
-  const formatCaptureTime = (dateStr) => {
-    if (!dateStr) return 'Just now';
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diffSec = Math.floor((now - d) / 1000);
-    if (diffSec < 60) return 'Just now';
-    const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return `${diffMin}m ago`;
-    const diffHours = Math.floor(diffMin / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-  };
-
-  // Helper to render source badge
-  const renderSourceBadge = (source) => {
-    const s = String(source || '').toLowerCase();
-    if (s.includes('meta') || s.includes('facebook') || s.includes('instagram')) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/90 shadow-2xs whitespace-nowrap">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
-          Facebook Meta Ads
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-        {source || 'Direct Entry'}
-      </span>
-    );
-  };
-
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-slate-50/70">
+    <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
       <Header
         title="CRM Operations Command Center"
-        subtitle="KISAN INDIA PVT LTD — Real-Time Telecalling, Meta Lead Capture & Sales Pipeline Hub"
+        subtitle="KISAN INDIA PVT LTD — Real-Time Monitoring, Meta Lead Capture & Sales Pipeline Hub"
       />
 
-      <main className="p-6 lg:p-8 space-y-6 flex-1">
-        {/* Action Toast / Notification Banner */}
+      <main className="p-4 sm:p-6 lg:p-8 space-y-5 flex-1">
+        {/* Dynamic Action / Notification Toast Banner */}
         {actionBanner && (
-          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center justify-between shadow-xs animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-              <span>{actionBanner}</span>
-            </div>
-            <button onClick={() => setActionBanner(null)} className="text-emerald-700 underline text-xs font-semibold cursor-pointer">
-              Dismiss
+          <div className="bg-slate-900 text-white px-4 py-3 rounded-xl border border-slate-700 text-xs font-semibold flex items-center justify-between shadow-lg">
+            <span className="flex items-center gap-2">
+              <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
+              {actionBanner}
+            </span>
+            <button onClick={() => setActionBanner(null)} className="text-slate-400 hover:text-white p-1 cursor-pointer">
+              <X size={14} />
             </button>
           </div>
         )}
 
         {/* 1. EASY-TO-USE MULTI-BUTTON ACTION HUB */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+        <div className="crm-card p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-              <Zap size={14} className="text-blue-600" /> Quick Operations & 1-Click Action Hub
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+              <Zap size={14} className="text-blue-600" /> Quick Operations &amp; 1-Click Action Hub
             </h3>
-            <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Live MongoDB & Meta Graph v21.0
+            <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              Live MongoDB &amp; Meta Graph v21.0
             </span>
           </div>
 
@@ -550,38 +552,27 @@ export default function Dashboard() {
             {/* Primary Action Button: Add Lead */}
             <button
               onClick={() => setShowAddLeadModal(true)}
-              className="px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/25 border border-blue-400/40 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-2 transition-colors cursor-pointer"
             >
               <Plus size={15} /> Add New Lead
-            </button>
-
-            {/* Quick Action Button: Dial Next Lead */}
-            <button
-              onClick={() => {
-                const nextLead = filteredLeads.find(l => l.status === 'Fresh Lead' || l.status === 'Assigned') || filteredLeads[0];
-                if (nextLead) openDialerForLead(nextLead);
-              }}
-              className="px-4 py-2.5 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-700 hover:to-violet-700 text-white text-xs font-bold rounded-xl shadow-md shadow-purple-500/25 border border-purple-400/40 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
-            >
-              <PhoneCall size={15} /> Open Quick Dialer
             </button>
 
             {/* Sync Meta Ads Leads Button */}
             <button
               onClick={handleSyncMetaLeads}
               disabled={syncingMeta}
-              className="px-4 py-2.5 bg-gradient-to-r from-[#1877F2] via-[#0d65d9] to-[#0866FF] hover:from-[#166fe5] hover:to-[#005ee5] text-white text-xs font-bold rounded-xl shadow-md shadow-blue-600/30 border border-blue-300/40 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2.5 bg-[#1877F2] hover:bg-[#166fe5] text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
             >
-              {syncingMeta ? <Loader2 size={15} className="animate-spin text-white" /> : <Zap size={15} className="text-amber-300" />}
+              {syncingMeta ? <Loader2 size={15} className="animate-spin text-white" /> : <RefreshCw size={15} />}
               Sync Meta Ads Leads
             </button>
 
             {/* Follow-ups Due Today Button */}
             <Link
               href="/followups"
-              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold rounded-xl shadow-md shadow-amber-500/25 border border-amber-300/40 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer"
+              className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-xl shadow-2xs flex items-center gap-2 transition-colors cursor-pointer"
             >
-              <Calendar size={15} className="text-amber-100" />
+              <Calendar size={15} className="text-amber-600" />
               Callbacks Due Today ({kpis.pendingFollowups})
             </Link>
 
@@ -589,23 +580,23 @@ export default function Dashboard() {
             <button
               onClick={handleAutoRedistributeSLA}
               disabled={redistributing}
-              className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-500/25 border border-emerald-400/40 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-xl shadow-2xs flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
             >
-              {redistributing ? <Loader2 size={15} className="animate-spin text-white" /> : <RefreshCw size={15} />}
+              {redistributing ? <Loader2 size={15} className="animate-spin text-blue-600" /> : <RefreshCw size={15} className="text-emerald-600" />}
               Auto-Distribute Stuck Leads
             </button>
 
             {/* Export Report CSV Button */}
-            <Link
-              href="/reports"
-              className="px-4 py-2.5 bg-gradient-to-r from-slate-800 via-slate-900 to-zinc-900 hover:from-slate-900 hover:to-black text-white text-xs font-bold rounded-xl shadow-md shadow-slate-900/25 border border-slate-700 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer ml-auto"
+            <button
+              onClick={handleExportCSV}
+              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-2 transition-colors cursor-pointer ml-auto"
             >
-              <Download size={15} /> Export Excel / Reports
-            </Link>
+              <Download size={15} /> Export Leads CSV
+            </button>
           </div>
         </div>
 
-        {/* 2. CLEAN & CLEAR 4-METRIC KPI SECTION */}
+        {/* 2. 4-METRIC KPI SECTION */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Metric 1: Total Leads */}
           <Link
@@ -618,9 +609,9 @@ export default function Dashboard() {
                 {kpis.freshLeads} Fresh in Queue
               </span>
             </div>
-            <div className="flex items-baseline justify-between mt-1">
-              <p className="text-3xl font-heading font-extrabold text-slate-900 tabular-nums">
-                {loading ? '—' : kpis.totalLeads}
+            <div className="flex items-baseline justify-between">
+              <p className="text-3xl font-heading font-extrabold text-slate-900 tracking-tight">
+                {totalLeadsCount || kpis.totalLeads}
               </p>
               <span className="text-xs font-semibold text-blue-600 group-hover:underline flex items-center gap-0.5">
                 View All <ChevronRight size={13} />
@@ -639,9 +630,9 @@ export default function Dashboard() {
                 {connectedPct}% Connected
               </span>
             </div>
-            <div className="flex items-baseline justify-between mt-1">
-              <p className="text-3xl font-heading font-extrabold text-slate-900 tabular-nums">
-                {loading ? '—' : totalCalls}
+            <div className="flex items-baseline justify-between">
+              <p className="text-3xl font-heading font-extrabold text-slate-900 tracking-tight">
+                {totalCalls}
               </p>
               <span className="text-xs font-semibold text-emerald-600 group-hover:underline flex items-center gap-0.5">
                 {connectedCalls} Connected <ChevronRight size={13} />
@@ -649,9 +640,9 @@ export default function Dashboard() {
             </div>
           </Link>
 
-          {/* Metric 3: Qualified Prospects */}
+          {/* Metric 3: Qualified Hot Prospects */}
           <Link
-            href="/leads?status=Interested"
+            href="/campaigns"
             className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-colors block group"
           >
             <div className="flex items-center justify-between mb-2">
@@ -660,9 +651,9 @@ export default function Dashboard() {
                 {kpis.closedDeals} Deals Won
               </span>
             </div>
-            <div className="flex items-baseline justify-between mt-1">
-              <p className="text-3xl font-heading font-extrabold text-indigo-600 tabular-nums">
-                {loading ? '—' : kpis.interestedLeads}
+            <div className="flex items-baseline justify-between">
+              <p className="text-3xl font-heading font-extrabold text-indigo-600 tracking-tight">
+                {kpis.interestedLeads}
               </p>
               <span className="text-xs font-semibold text-indigo-600 group-hover:underline flex items-center gap-0.5">
                 {kpis.conversionRate}% Win Rate <ChevronRight size={13} />
@@ -670,27 +661,21 @@ export default function Dashboard() {
             </div>
           </Link>
 
-          {/* Metric 4: Follow-ups & SLA Alerts */}
+          {/* Metric 4: Callbacks & SLA Alert */}
           <Link
             href="/followups"
-            className={`bg-white p-5 rounded-2xl border shadow-xs transition-colors block group ${
-              kpis.overdueFollowups > 0 ? 'border-amber-300 hover:border-amber-400' : 'border-slate-200/80 hover:border-blue-300'
-            }`}
+            className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-colors block group"
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Callbacks & SLA Alert</span>
-              {kpis.overdueFollowups > 0 ? (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                  {kpis.overdueFollowups} Overdue
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  On Schedule
-                </span>
-              )}
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Callbacks &amp; SLA Alert</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                kpis.overdueFollowups > 0 ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              }`}>
+                {kpis.overdueFollowups > 0 ? `${kpis.overdueFollowups} Overdue` : 'On Schedule'}
+              </span>
             </div>
-            <div className="flex items-baseline justify-between mt-1">
-              <p className="text-3xl font-heading font-extrabold text-slate-900 tabular-nums">
+            <div className="flex items-baseline justify-between">
+              <p className="text-3xl font-heading font-extrabold text-slate-900 tracking-tight">
                 {loading ? '—' : kpis.pendingFollowups}
               </p>
               <span className="text-xs font-semibold text-blue-600 group-hover:underline flex items-center gap-0.5">
@@ -700,39 +685,39 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        {/* 3. PRIMARY OPERATIONAL WORKBENCH WITH CAPTURED LEADS & BULK OPERATIONS HUB */}
+        {/* 3. PRIMARY OPERATIONAL WORKBENCH WITH CAPTURED LEADS (NEODOVE STYLE TABLE) */}
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          {/* Interactive Switcher Buttons Bar */}
+          {/* Switcher Tabs Bar */}
           <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => setActiveTab('LEADS')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm active:scale-95 ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                   activeTab === 'LEADS'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 border border-blue-400/40'
-                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90'
                 }`}
               >
                 <Layers size={14} className={activeTab === 'LEADS' ? 'text-blue-100' : 'text-blue-600'} />
-                Live Captured Leads & Bulk Dialer ({rawRecentLeads.length})
+                Live Captured Leads ({totalLeadsCount || rawRecentLeads.length})
               </button>
               <button
                 onClick={() => setActiveTab('CALLERS')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm active:scale-95 ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                   activeTab === 'CALLERS'
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/25 border border-purple-400/40'
-                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90'
                 }`}
               >
-                <Users size={14} className={activeTab === 'CALLERS' ? 'text-purple-100' : 'text-purple-600'} />
+                <Users size={14} className={activeTab === 'CALLERS' ? 'text-blue-100' : 'text-slate-600'} />
                 Active Telecaller Floor ({team.length})
               </button>
               <button
                 onClick={() => setActiveTab('CAMPAIGNS')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm active:scale-95 ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                   activeTab === 'CAMPAIGNS'
-                    ? 'bg-gradient-to-r from-[#1877F2] to-[#0057c7] text-white shadow-md shadow-blue-500/25 border border-blue-400/40'
-                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90'
                 }`}
               >
                 <Target size={14} className={activeTab === 'CAMPAIGNS' ? 'text-blue-100' : 'text-[#1877F2]'} />
@@ -741,9 +726,9 @@ export default function Dashboard() {
               {kpis.slaBreachCount > 0 && (
                 <button
                   onClick={() => setActiveTab('SLA')}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm active:scale-95 ${
+                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                     activeTab === 'SLA'
-                      ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-md shadow-rose-500/25 border border-rose-400/40'
+                      ? 'bg-rose-600 text-white shadow-xs'
                       : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
                   }`}
                 >
@@ -755,11 +740,15 @@ export default function Dashboard() {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => { setLoading(true); fetchDashboard(); }}
+                onClick={() => {
+                  setLoading(true);
+                  fetchDashboard();
+                  fetchWorkbenchLeads();
+                }}
                 className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
                 title="Refresh Live Data"
               >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw size={14} className={loading || workbenchLoading ? 'animate-spin' : ''} />
               </button>
               <Link
                 href="/leads"
@@ -770,386 +759,545 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* TAB 1: CAPTURED LEADS WORKBENCH WITH COMPREHENSIVE FILTERS & BULK ASSIGN BAR */}
+          {/* TAB 1: CAPTURED LEADS WORKBENCH (NEODOVE STYLE TABLE AS PER SCREENSHOT) */}
           {activeTab === 'LEADS' && (
             <div className="flex flex-col">
-              {/* TOP MULTI-FILTER CONTROL BAR */}
-              <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 space-y-3">
-                {/* 1. Quick Presets Filter Pills Row */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
-                    <Filter size={12} /> Filters:
-                  </span>
-                  <button
-                    onClick={() => setQuickPreset('ALL')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 ${
-                      quickPreset === 'ALL'
-                        ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-sm shadow-slate-900/20 border border-slate-700'
-                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    All Captured ({presetCounts.ALL})
-                  </button>
-                  <button
-                    onClick={() => setQuickPreset('META')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-2xs active:scale-95 ${
-                      quickPreset === 'META'
-                        ? 'bg-gradient-to-r from-[#1877F2] to-[#0866FF] text-white shadow-sm shadow-blue-500/25 border border-blue-400/40'
-                        : 'bg-blue-50/80 text-blue-700 border border-blue-200 hover:bg-blue-100'
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                    Meta Ads Leads ({presetCounts.META})
-                  </button>
-                  <button
-                    onClick={() => setQuickPreset('FRESH')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-2xs active:scale-95 ${
-                      quickPreset === 'FRESH'
-                        ? 'bg-gradient-to-r from-sky-500 to-cyan-600 text-white shadow-sm shadow-sky-500/25 border border-sky-400/40'
-                        : 'bg-sky-50/80 text-sky-700 border border-sky-200 hover:bg-sky-100'
-                    }`}
-                  >
-                    Fresh in Queue ({presetCounts.FRESH})
-                  </button>
-                  <button
-                    onClick={() => setQuickPreset('UNASSIGNED')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-2xs active:scale-95 ${
-                      quickPreset === 'UNASSIGNED'
-                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/25 border border-amber-400/40'
-                        : 'bg-amber-50/80 text-amber-800 border border-amber-200 hover:bg-amber-100'
-                    }`}
-                  >
-                    Unassigned ({presetCounts.UNASSIGNED})
-                  </button>
-                  <button
-                    onClick={() => setQuickPreset('HOT')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-2xs active:scale-95 ${
-                      quickPreset === 'HOT'
-                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm shadow-emerald-500/25 border border-emerald-400/40'
-                        : 'bg-emerald-50/80 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
-                    }`}
-                  >
-                    <Star size={13} className="shrink-0" /> Hot / Interested ({presetCounts.HOT})
-                  </button>
-                </div>
-
-                {/* 2. Detailed Filter Dropdowns & Live Search */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                  {/* Search Input */}
-                  <div className="relative flex-1 min-w-[200px] max-w-sm">
-                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Search prospect, phone (+91), L-ID, city..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-8 py-2 text-xs font-medium bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 shadow-2xs"
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                      >
-                        <X size={13} />
-                      </button>
-                    )}
+              {/* TOP MULTI-DROPDOWN FILTER CONTROL BAR */}
+              <div className="p-3.5 bg-white border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+                {/* Left: Filter dropdowns */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Date Dropdown */}
+                  <div className="relative">
+                    <select
+                      value={dateFilter}
+                      onChange={(e) => { setDateFilter(e.target.value); setPage(1); }}
+                      className="appearance-none bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 pl-3.5 pr-8 rounded-lg cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="ALL">Date ▾</option>
+                      <option value="today">Today</option>
+                      <option value="yesterday">Yesterday</option>
+                      <option value="last7">Last 7 Days</option>
+                      <option value="last30">Last 30 Days</option>
+                    </select>
                   </div>
 
-                  {/* Lead Source Filter Dropdown */}
-                  <select
-                    value={sourceFilter}
-                    onChange={(e) => setSourceFilter(e.target.value)}
-                    className="px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-xl text-slate-700 focus:outline-none cursor-pointer shadow-2xs"
-                  >
-                    <option value="">All Sources</option>
-                    {sourceOptions.map(src => (
-                      <option key={src} value={src}>{src}</option>
-                    ))}
-                  </select>
+                  {/* Users Dropdown */}
+                  <div className="relative">
+                    <select
+                      value={callerFilter}
+                      onChange={(e) => { setCallerFilter(e.target.value); setPage(1); }}
+                      className="appearance-none bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 pl-3.5 pr-8 rounded-lg cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="ALL">Users ▾</option>
+                      <option value="UNASSIGNED">Unassigned Only</option>
+                      {(usersList.length > 0 ? usersList : team).map(u => (
+                        <option key={u.id || u._id} value={u.id || u._id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                  {/* Campaign Filter Dropdown */}
-                  <select
-                    value={campaignFilter}
-                    onChange={(e) => setCampaignFilter(e.target.value)}
-                    className="px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-xl text-slate-700 focus:outline-none cursor-pointer shadow-2xs"
-                  >
-                    <option value="">All Campaigns</option>
-                    {campaignOptions.map(cmp => (
-                      <option key={cmp} value={cmp}>{cmp}</option>
-                    ))}
-                  </select>
+                  {/* Stage Dropdown */}
+                  <div className="relative">
+                    <select
+                      value={stageFilter}
+                      onChange={(e) => { setStageFilter(e.target.value); setPage(1); }}
+                      className="appearance-none bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 pl-3.5 pr-8 rounded-lg cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="ALL">Stage ▾</option>
+                      {ALL_STATUS_OPTIONS.map(st => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                  {/* Status Filter Dropdown */}
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-xl text-slate-700 focus:outline-none cursor-pointer shadow-2xs"
-                  >
-                    <option value="">All Statuses</option>
-                    {ALL_STATUS_OPTIONS.map(st => (
-                      <option key={st} value={st}>{st}</option>
-                    ))}
-                  </select>
+                  {/* Campaign Dropdown */}
+                  <div className="relative">
+                    <select
+                      value={campaignFilter}
+                      onChange={(e) => { setCampaignFilter(e.target.value); setPage(1); }}
+                      className="appearance-none bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2 pl-3.5 pr-8 rounded-lg cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="ALL">Campaign ▾</option>
+                      {(campaignOptions.length > 0 ? campaignOptions : campaigns.map(c => c.name)).map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                  {/* Telecaller Filter Dropdown */}
-                  <select
-                    value={callerFilter}
-                    onChange={(e) => setCallerFilter(e.target.value)}
-                    className="px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-xl text-slate-700 focus:outline-none cursor-pointer shadow-2xs"
-                  >
-                    <option value="">All Telecallers</option>
-                    <option value="UNASSIGNED">Unassigned Only</option>
-                    {team.map(t => (
-                      <option key={t.id} value={t.id}>{t.name} ({t.status})</option>
-                    ))}
-                  </select>
-
-                  {/* Reset Filters Button */}
-                  {isAnyFilterActive && (
+                  {/* Purple Active Filters Pill */}
+                  {activeFilterCount > 0 && (
                     <button
                       onClick={resetAllFilters}
-                      className="px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                      className="border border-[#7C3AED] text-[#7C3AED] bg-[#F5F3FF] hover:bg-[#EDE9FE] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                      title="Clear all active filters"
                     >
-                      <X size={13} /> Reset Filters
+                      <Filter size={13} className="text-[#7C3AED]" />
+                      <span>Filters</span>
+                      <span className="w-4 h-4 rounded-full bg-[#7C3AED] text-white text-[10px] flex items-center justify-center font-bold">
+                        {activeFilterCount}
+                      </span>
+                      <X size={13} className="text-[#7C3AED] ml-0.5" />
                     </button>
                   )}
 
-                  <span className="text-xs font-medium text-slate-400 ml-auto tabular-nums">
-                    Showing <strong>{filteredLeads.length}</strong> of {rawRecentLeads.length} leads
-                  </span>
+                  {/* Save Filter / Clear Filters Button */}
+                  {activeFilterCount > 0 ? (
+                    <button
+                      onClick={resetAllFilters}
+                      className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors"
+                    >
+                      Clear Filters
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => showToast('Filters saved for quick access!')}
+                      className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors"
+                    >
+                      Save Filter
+                    </button>
+                  )}
+                </div>
+
+                {/* Right side search & utilities */}
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <div className="relative w-full sm:w-56">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by number"
+                      value={searchQuery}
+                      onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+
+                  {/* Export CSV Download Button */}
+                  <button
+                    onClick={handleExportCSV}
+                    title="Download CSV"
+                    className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <Download size={15} />
+                  </button>
+
+                  {/* Column Visibility Toggle Button */}
+                  <div className="relative" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setShowColMenu(!showColMenu)}
+                      title="Toggle Columns"
+                      className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                    >
+                      <SlidersHorizontal size={15} />
+                    </button>
+
+                    {showColMenu && (
+                      <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-30 text-xs space-y-1">
+                        <p className="px-2 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          Display Columns
+                        </p>
+                        {Object.keys(columns).map((colKey) => (
+                          <label key={colKey} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer font-medium text-slate-700 capitalize">
+                            <input
+                              type="checkbox"
+                              checked={columns[colKey]}
+                              onChange={(e) => setColumns({ ...columns, [colKey]: e.target.checked })}
+                              className="rounded border-slate-300 text-blue-600 accent-blue-600"
+                            />
+                            <span>{colKey.replace(/([A-Z])/g, ' $1')}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* FLOATING / STICKY BULK ACTION BAR */}
+              {/* STICKY BULK ACTION BAR */}
               {selectedLeadIds.length > 0 && (
-                <div className="bg-slate-900 text-white px-6 py-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4 shadow-md animate-in slide-in-from-top-2 duration-150">
+                <div className="bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50/90 border-b border-purple-200/90 px-6 py-3 flex flex-wrap items-center justify-between gap-4 shadow-xs animate-in slide-in-from-top-2 duration-150">
                   <div className="flex items-center gap-3">
-                    <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-500 text-white text-xs font-bold">
+                    <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#7C3AED] text-white text-xs font-extrabold shadow-2xs">
                       {selectedLeadIds.length}
                     </span>
                     <div>
-                      <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <CheckSquare size={14} className="text-blue-400" />
-                        Captured Leads Selected for Bulk Telecaller Assignment
+                      <p className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <CheckSquare size={14} className="text-[#7C3AED]" />
+                        <span><strong className="text-[#7C3AED] font-extrabold">{selectedLeadIds.length}</strong> Captured Leads Selected</span>
                       </p>
-                      <p className="text-[11px] text-slate-400">
-                        Assign selected leads in one click to any telecaller or auto-distribute via Round-Robin
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        Assign to telecaller pool or perform bulk status update in one click
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <button
-                      onClick={toggleSelectAllFiltered}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
-                    >
-                      {isAllFilteredSelected ? 'Deselect Filtered' : `Select All ${filteredLeads.length} Filtered`}
-                    </button>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {/* Bulk Assignment */}
+                    <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-purple-200/90 shadow-2xs">
+                      <select
+                        value={bulkCallerId}
+                        onChange={(e) => setBulkCallerId(e.target.value)}
+                        className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
+                      >
+                        <option value="ROUND_ROBIN">Auto Round-Robin Pool</option>
+                        {(usersList.length > 0 ? usersList : team).map(t => (
+                          <option key={t.id || t._id} value={t.id || t._id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleBulkAssign}
+                        disabled={bulkAssigning}
+                        className="px-3.5 py-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
+                      >
+                        {bulkAssigning ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin" />
+                            Assigning...
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck size={13} />
+                            Assign Telecaller
+                          </>
+                        )}
+                      </button>
+                    </div>
 
-                    <select
-                      value={bulkCallerId}
-                      onChange={(e) => setBulkCallerId(e.target.value)}
-                      className="px-3.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
-                    >
-                      <option value="ROUND_ROBIN">Auto Round-Robin Pool (Distribute Evenly)</option>
-                      {team.map(t => (
-                        <option key={t.id} value={t.id}>
-                          {t.name} ({t.status === 'Online' ? 'Active' : t.status})
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      onClick={handleBulkAssign}
-                      disabled={bulkAssigning}
-                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl cursor-pointer transition-all flex items-center gap-1.5 shadow-xs"
-                    >
-                      {bulkAssigning ? (
-                        <>
-                          <Loader2 size={13} className="animate-spin" />
-                          Assigning...
-                        </>
-                      ) : (
-                        <>
-                          <UserCheck size={14} />
-                          Assign Selected Leads
-                        </>
-                      )}
-                    </button>
+                    {/* Bulk Status Update */}
+                    <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-purple-200/90 shadow-2xs">
+                      <select
+                        value={bulkStatus}
+                        onChange={(e) => setBulkStatus(e.target.value)}
+                        className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
+                      >
+                        <option value="">Set Stage...</option>
+                        {ALL_STATUS_OPTIONS.map(st => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleBulkStatusUpdate}
+                        disabled={bulkUpdatingStatus || !bulkStatus}
+                        className="px-3.5 py-1.5 bg-white hover:bg-purple-50 border border-purple-200 text-[#7C3AED] hover:text-[#6D28D9] disabled:opacity-50 text-xs font-semibold rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 shadow-2xs"
+                      >
+                        {bulkUpdatingStatus ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          'Update Stage'
+                        )}
+                      </button>
+                    </div>
 
                     <button
                       onClick={() => setSelectedLeadIds([])}
-                      className="text-xs text-slate-400 hover:text-white px-2 py-1 cursor-pointer"
+                      className="text-xs text-slate-600 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg border border-transparent hover:border-rose-200 transition-colors cursor-pointer font-medium flex items-center gap-1"
                     >
-                      Clear
+                      <X size={13} />
+                      Deselect All
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* CAPTURED LEADS TABLE */}
+              {/* CAPTURED LEADS TABLE (EXACT MATCH TO SCREENSHOT COLUMNS) */}
               <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-50/80 border-b border-slate-100">
-                      <th className="py-3.5 pl-6 pr-2 w-10">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-[#FAFBFD] border-b border-slate-200/80 sticky top-0 z-10">
+                    <tr className="text-[12px] font-semibold text-slate-500 whitespace-nowrap">
+                      <th className="py-3 px-3 w-10 text-center">
                         <input
                           type="checkbox"
-                          checked={isAllFilteredSelected}
-                          onChange={toggleSelectAllFiltered}
-                          className="rounded border-slate-300 cursor-pointer text-blue-600 focus:ring-blue-500"
+                          checked={isAllPageSelected}
+                          onChange={toggleSelectAllPage}
+                          aria-label="Select all leads on this page"
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
                         />
                       </th>
-                      <th className="py-3.5 px-4">Lead ID & Time</th>
-                      <th className="py-3.5 px-4">Prospect & Phone</th>
-                      <th className="py-3.5 px-4">Lead Source & Platform</th>
-                      <th className="py-3.5 px-4">Campaign Name</th>
-                      <th className="py-3.5 px-4">Pipeline Status</th>
-                      <th className="py-3.5 px-4">Assigned Telecaller</th>
-                      <th className="py-3.5 px-6 text-right">Quick 1-Click Action</th>
+                      {columns.no && <th className="py-3 px-3 font-semibold text-slate-500">No.</th>}
+                      {columns.name && <th className="py-3 px-4 font-semibold text-slate-500">Name</th>}
+                      {columns.number && <th className="py-3 px-4 font-semibold text-slate-500">Number</th>}
+                      {columns.email && <th className="py-3 px-4 font-semibold text-slate-500">Email</th>}
+                      {columns.campaign && <th className="py-3 px-4 font-semibold text-slate-500">Campaign Name</th>}
+                      {columns.creationDate && <th className="py-3 px-4 font-semibold text-slate-500">Creation Date</th>}
+                      {columns.updatedAt && <th className="py-3 px-4 font-semibold text-slate-500">Updated at</th>}
+                      {columns.stage && <th className="py-3 px-4 font-semibold text-slate-500">Lead Stage</th>}
+                      {columns.tag && <th className="py-3 px-3 font-semibold text-slate-500">Tag</th>}
+                      {columns.userAssigned && <th className="py-3 px-4 font-semibold text-slate-500">User Assigned</th>}
+                      {columns.action && <th className="py-3 px-4 font-semibold text-slate-500 text-right">Action</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
-                    {filteredLeads.length === 0 ? (
+                    {workbenchLoading ? (
                       <tr>
-                        <td colSpan="8" className="py-14 text-center text-slate-400 font-medium">
-                          <ShieldAlert size={28} className="mx-auto mb-2 text-slate-300" />
-                          <p className="font-semibold text-slate-600">No matching captured leads found.</p>
-                          <p className="text-[11px] text-slate-400 mt-1">
-                            Try resetting filters or clicking &ldquo;Sync Meta Ads Leads&rdquo; above.
-                          </p>
-                          {isAnyFilterActive && (
+                        <td colSpan="12" className="py-16 text-center text-slate-400">
+                          <Loader2 size={24} className="animate-spin mx-auto mb-2 text-blue-600" />
+                          <p className="text-xs font-semibold text-slate-600">Loading leads...</p>
+                        </td>
+                      </tr>
+                    ) : workbenchLeads.length === 0 ? (
+                      <tr>
+                        <td colSpan="12" className="py-16 text-center text-slate-400">
+                          <ShieldAlert size={30} className="mx-auto mb-2 text-slate-300" />
+                          <p className="text-sm font-bold text-slate-700">No matching captured leads found</p>
+                          <p className="text-xs text-slate-400 mt-1">Try resetting filters or clicking &ldquo;Sync Meta Ads Leads&rdquo; above.</p>
+                          {activeFilterCount > 0 && (
                             <button
                               onClick={resetAllFilters}
-                              className="mt-3 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-xs font-semibold cursor-pointer"
+                              className="mt-3 px-3.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold cursor-pointer"
                             >
-                              Reset All Filters
+                              Clear All Filters
                             </button>
                           )}
                         </td>
                       </tr>
                     ) : (
-                      filteredLeads.map((lead) => {
-                        const isSelected = selectedLeadIds.includes(lead.id);
+                      workbenchLeads.map((lead, idx) => {
+                        const leadId = lead._id || lead.id;
+                        const isChecked = selectedLeadIds.includes(leadId);
+                        const rowNumber = (page - 1) * limit + idx + 1;
+                        const tagLabel = lead.priority === 'High' || lead.priority === 'VIP' ? 'Hot' : 'Hot';
+                        const assignedName = lead.assigned_to?.name || lead.assignedTo || 'Unassigned';
+
                         return (
                           <tr
-                            key={lead.id}
-                            className={`hover:bg-slate-50/70 transition-colors ${
-                              isSelected ? 'bg-blue-50/40' : ''
+                            key={leadId}
+                            className={`hover:bg-slate-50/70 transition-colors border-b border-slate-100 ${
+                              isChecked ? 'bg-blue-50/50' : ''
                             }`}
                           >
-                            {/* Checkbox Column */}
-                            <td className="py-4 pl-6 pr-2">
+                            {/* Checkbox */}
+                            <td
+                              className="py-3.5 px-3 text-center cursor-pointer select-none"
+                              onClick={(e) => {
+                                if (e.target.tagName !== 'INPUT') {
+                                  setSelectedLeadIds(prev =>
+                                    prev.includes(leadId) ? prev.filter(i => i !== leadId) : [...prev, leadId]
+                                  );
+                                }
+                              }}
+                            >
                               <input
                                 type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleLeadSelection(lead.id)}
-                                className="rounded border-slate-300 cursor-pointer text-blue-600 focus:ring-blue-500"
+                                checked={isChecked}
+                                onChange={() => {
+                                  setSelectedLeadIds(prev =>
+                                    prev.includes(leadId) ? prev.filter(i => i !== leadId) : [...prev, leadId]
+                                  );
+                                }}
+                                aria-label={`Select row ${rowNumber}`}
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
                               />
                             </td>
 
-                            {/* Lead ID & Capture Timestamp */}
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <span className="text-xs font-bold text-blue-600 tabular-nums">
-                                {lead.lead_id}
-                              </span>
-                              <span className="block text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                                <Clock size={11} className="text-slate-400 shrink-0" />
-                                {formatCaptureTime(lead.createdAt)}
-                              </span>
-                            </td>
+                            {/* No. (Row Index Number) */}
+                            {columns.no && (
+                              <td className="py-3.5 px-3 font-semibold text-slate-700 tabular-nums">
+                                {rowNumber}
+                              </td>
+                            )}
 
-                            {/* Prospect Name & Phone */}
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <p className="font-semibold text-slate-900 text-sm">{lead.name}</p>
-                              <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-0.5">
-                                <Phone size={11} className="text-slate-400 shrink-0" />
-                                <span className="font-semibold tabular-nums">+91 {lead.mobile}</span>
-                              </div>
-                              <span className="block text-[10px] text-slate-400 mt-0.5">
-                                {[lead.city, lead.business_type].filter(Boolean).join(' • ') || '—'}
-                              </span>
-                            </td>
+                            {/* Name */}
+                            {columns.name && (
+                              <td className="py-3.5 px-4 font-semibold text-slate-900 whitespace-nowrap">
+                                {lead.name || '—'}
+                              </td>
+                            )}
 
-                            {/* Source Badge with Logo Styling */}
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              {renderSourceBadge(lead.lead_source)}
-                            </td>
+                            {/* Number */}
+                            {columns.number && (
+                              <td className="py-3.5 px-4 font-medium text-slate-800 tabular-nums whitespace-nowrap">
+                                {lead.mobile || '—'}
+                              </td>
+                            )}
+
+                            {/* Email */}
+                            {columns.email && (
+                              <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap max-w-[170px] truncate" title={lead.email}>
+                                {lead.email || ''}
+                              </td>
+                            )}
 
                             {/* Campaign Name */}
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <span className="text-xs font-semibold text-slate-800">
-                                {lead.campaign_name || '—'}
-                              </span>
-                              <span className="block text-[10px] text-slate-400">
-                                {lead.product_interest || '—'}
-                              </span>
-                            </td>
+                            {columns.campaign && (
+                              <td className="py-3.5 px-4 font-medium text-slate-800 whitespace-nowrap">
+                                {lead.campaign_name || 'Agra'}
+                              </td>
+                            )}
 
-                            {/* Editable Inline Status Dropdown */}
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <select
-                                value={lead.status}
-                                onChange={(e) => handleInlineStatus(lead.id, e.target.value)}
-                                disabled={inlineUpdatingId === lead.id}
-                                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer focus:outline-none ${
-                                  STATUS_STYLES[lead.status] || 'bg-slate-100 text-slate-700 border-slate-200'
-                                }`}
-                              >
-                                {ALL_STATUS_OPTIONS.map(st => (
-                                  <option key={st} value={st}>{st}</option>
-                                ))}
-                              </select>
-                            </td>
+                            {/* Creation Date */}
+                            {columns.creationDate && (
+                              <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap text-[11px] tabular-nums">
+                                {formatLeadDate(lead.createdAt)}
+                              </td>
+                            )}
 
-                            {/* Editable Inline Assigned Telecaller Dropdown */}
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <select
-                                value={lead.assignedToId || (team.find(t => t.name === lead.assignedTo)?.id || '')}
-                                onChange={(e) => handleInlineAssign(lead.id, e.target.value)}
-                                disabled={inlineUpdatingId === lead.id}
-                                className="text-xs font-bold border border-slate-200 rounded-xl px-2.5 py-1.5 bg-white text-slate-800 hover:border-slate-300 focus:outline-none cursor-pointer w-40"
-                              >
-                                <option value="">Unassigned</option>
-                                {team.map(u => (
-                                  <option key={u.id} value={u.id}>{u.name}</option>
-                                ))}
-                              </select>
-                            </td>
+                            {/* Updated at */}
+                            {columns.updatedAt && (
+                              <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap text-[11px] tabular-nums">
+                                {formatLeadDate(lead.updatedAt || lead.createdAt)}
+                              </td>
+                            )}
 
-                            {/* DIRECT 1-CLICK ACTION BUTTONS */}
-                            <td className="py-4 px-6 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => openDialerForLead(lead)}
-                                  className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm shadow-blue-500/25 border border-blue-400/30 transition-all active:scale-95 cursor-pointer"
-                                  title="Open Quick Dialer for this lead"
-                                >
-                                  <Phone size={13} /> Call
-                                </button>
-                                <a
-                                  href={`https://wa.me/91${String(lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${lead.name} ji, KisanConnect regarding your recent inquiry.`)}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="p-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-sm shadow-emerald-500/25 border border-emerald-400/30 transition-all active:scale-95 cursor-pointer flex items-center justify-center"
-                                  title="Open Direct WhatsApp Chat"
-                                >
-                                  <MessageCircle size={15} />
-                                </a>
-                                <Link
-                                  href={`/leads?search=${encodeURIComponent(lead.lead_id)}`}
-                                  className="px-3 py-1.5 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
-                                >
-                                  Details
-                                </Link>
-                              </div>
-                            </td>
+                            {/* Lead Stage */}
+                            {columns.stage && (
+                              <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-800">
+                                {lead.status || 'Fresh Inquiry'}
+                              </td>
+                            )}
+
+                            {/* Tag */}
+                            {columns.tag && (
+                              <td className="py-3.5 px-3 whitespace-nowrap">
+                                <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200/70">
+                                  {tagLabel}
+                                </span>
+                              </td>
+                            )}
+
+                            {/* User Assigned */}
+                            {columns.userAssigned && (
+                              <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-800">
+                                {assignedName}
+                              </td>
+                            )}
+
+                            {/* Action: Edit + 3-dots */}
+                            {columns.action && (
+                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5 relative">
+                                  <button
+                                    onClick={() => setEditingLead({ ...lead, id: leadId })}
+                                    className="px-2.5 py-1 text-xs font-semibold rounded-md border border-[#C4B5FD] text-[#6D28D9] bg-[#FAF5FF] hover:bg-[#F3E8FF] transition-colors cursor-pointer"
+                                  >
+                                    Edit
+                                  </button>
+
+                                  <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      onClick={() => setActiveMenuId(activeMenuId === leadId ? null : leadId)}
+                                      className="p-1 rounded hover:bg-slate-100 text-slate-500 cursor-pointer"
+                                      title="More actions"
+                                    >
+                                      <MoreVertical size={15} />
+                                    </button>
+
+                                    {activeMenuId === leadId && (
+                                      <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-30 text-xs">
+                                        <a
+                                          href={`https://wa.me/91${String(lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${lead.name} ji, regarding your inquiry.`)}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 font-medium"
+                                        >
+                                          <MessageCircle size={14} className="text-emerald-600" />
+                                          <span>WhatsApp Chat</span>
+                                        </a>
+                                        <button
+                                          onClick={() => {
+                                            setActiveMenuId(null);
+                                            openInspector(leadId);
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 font-medium text-left cursor-pointer"
+                                        >
+                                          <Eye size={14} className="text-blue-600" />
+                                          <span>View Timeline</span>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setActiveMenuId(null);
+                                            setEditingLead({ ...lead, id: leadId });
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 font-medium text-left cursor-pointer"
+                                        >
+                                          <Edit3 size={14} className="text-purple-600" />
+                                          <span>Quick Edit Lead</span>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setActiveMenuId(null);
+                                            handleDeleteLead(leadId, lead.name);
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 font-medium text-left cursor-pointer border-t border-slate-100"
+                                        >
+                                          <Trash2 size={14} />
+                                          <span>Delete Lead</span>
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            )}
                           </tr>
                         );
                       })
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* 4. BOTTOM PAGINATION BAR (EXACT MATCH TO SCREENSHOT) */}
+              <div className="px-5 py-3 border-t border-slate-200/80 bg-white flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+                <div>
+                  {selectedLeadIds.length > 0 ? (
+                    <span className="font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
+                      {selectedLeadIds.length} of {totalLeadsCount} selected
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 font-medium">
+                      Total <strong>{totalLeadsCount}</strong> leads captured
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-4 ml-auto">
+                  {/* Items per page: [ 50 ▾ ] */}
+                  <div className="flex items-center gap-1.5 font-medium text-slate-600">
+                    <span>Items per page:</span>
+                    <select
+                      value={limit}
+                      onChange={(e) => {
+                        setLimit(Number(e.target.value));
+                        setPage(1);
+                      }}
+                      className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-semibold text-slate-800 cursor-pointer focus:outline-none"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={200}>200</option>
+                    </select>
+                  </div>
+
+                  {/* 1 - 50 of 607 */}
+                  <span className="font-medium text-slate-700 tabular-nums">
+                    {startIndex} – {endIndex} of {totalLeadsCount}
+                  </span>
+
+                  {/* Previous / Next buttons */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                      className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer text-slate-700"
+                      title="Previous page"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                      className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer text-slate-700"
+                      title="Next page"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1281,12 +1429,12 @@ export default function Dashboard() {
                       <td className="py-4 px-4 font-medium text-slate-700">{lead.city || '—'}</td>
                       <td className="py-4 px-4 font-medium text-slate-700">{lead.assignedTo}</td>
                       <td className="py-4 px-6 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => openDialerForLead(lead)}
-                          className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 ml-auto cursor-pointer shadow-xs"
+                        <Link
+                          href={`/leads?search=${encodeURIComponent(lead.lead_id)}`}
+                          className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold rounded-xl text-xs inline-flex items-center gap-1.5 ml-auto cursor-pointer transition-colors shadow-2xs"
                         >
-                          <Phone size={13} /> Call Immediately
-                        </button>
+                          Inspect Lead <ChevronRight size={13} />
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -1297,10 +1445,10 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* MODAL 1: ADD NEW LEAD (1-CLICK POPUP) */}
+      {/* MODAL 1: ADD NEW LEAD */}
       {showAddLeadModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 relative">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 relative">
             <button
               onClick={() => setShowAddLeadModal(false)}
               className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer"
@@ -1309,7 +1457,7 @@ export default function Dashboard() {
             </button>
             <div>
               <h3 className="text-lg font-heading font-bold text-slate-900">Add New Prospect Lead</h3>
-              <p className="text-xs text-slate-500 font-medium">Instantly saves lead to MongoDB and assigns to active telecaller</p>
+              <p className="text-xs text-slate-500 font-medium">Instantly saves lead to MongoDB and assigns to active telecaller pool</p>
             </div>
             <form onSubmit={handleCreateLead} className="space-y-3.5 text-xs">
               <div>
@@ -1336,6 +1484,18 @@ export default function Dashboard() {
                   />
                 </div>
                 <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Email</label>
+                  <input
+                    type="email"
+                    placeholder="prospect@example.com"
+                    value={newLeadForm.email}
+                    onChange={e => setNewLeadForm({ ...newLeadForm, email: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
                   <label className="font-semibold text-slate-700 block mb-1">City / Region</label>
                   <input
                     type="text"
@@ -1345,28 +1505,29 @@ export default function Dashboard() {
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
                 </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Campaign Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Agra, WFH"
+                    value={newLeadForm.campaign_name}
+                    onChange={e => setNewLeadForm({ ...newLeadForm, campaign_name: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Business / Inquiry Type</label>
-                  <input
-                    type="text"
-                    placeholder="Optional business category"
-                    value={newLeadForm.business_type}
-                    onChange={e => setNewLeadForm({ ...newLeadForm, business_type: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Requirement / Interest</label>
-                  <input
-                    type="text"
-                    placeholder="Optional requirement details"
-                    value={newLeadForm.product_interest}
-                    onChange={e => setNewLeadForm({ ...newLeadForm, product_interest: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Assign Telecaller</label>
+                <select
+                  value={newLeadForm.assigned_to}
+                  onChange={e => setNewLeadForm({ ...newLeadForm, assigned_to: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
+                >
+                  <option value="">Auto Round-Robin Pool</option>
+                  {(usersList.length > 0 ? usersList : team).map(u => (
+                    <option key={u.id || u._id} value={u.id || u._id}>{u.name}</option>
+                  ))}
+                </select>
               </div>
               <button
                 type="submit"
@@ -1374,92 +1535,263 @@ export default function Dashboard() {
                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
               >
                 {savingLead ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-                Add Lead & Auto-Assign
+                Add Lead &amp; Auto-Assign
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL 2: QUICK DIALER & DISPOSITION (1-CLICK POPUP) */}
-      {showDialerModal && dialTargetLead && (
+      {/* MODAL 2: QUICK EDIT LEAD MODAL */}
+      {editingLead && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 relative">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-200 relative">
             <button
-              onClick={() => setShowDialerModal(false)}
+              onClick={() => setEditingLead(null)}
               className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer"
             >
               <X size={16} />
             </button>
             <div>
-              <h3 className="text-lg font-heading font-bold text-slate-900">Click-to-Call Dialer & Disposition</h3>
+              <h3 className="text-base font-bold text-slate-900">Edit Lead Record</h3>
               <p className="text-xs text-slate-500 font-medium">
-                Calling <strong className="text-slate-800">{dialTargetLead.name}</strong> (+91 {dialTargetLead.mobile})
+                Lead ID: <strong className="text-blue-600">{editingLead.lead_id}</strong>
               </p>
             </div>
-            <form onSubmit={handleSaveCall} className="space-y-3.5 text-xs">
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Telecaller Agent Calling *</label>
-                <select
-                  required
-                  value={dialerForm.callerId}
-                  onChange={e => setDialerForm({ ...dialerForm, callerId: e.target.value })}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                >
-                  {team.map(t => (
-                    <option key={t.id} value={t.id}>{t.name} ({t.team})</option>
-                  ))}
-                </select>
+
+            <form onSubmit={handleSaveEdit} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Prospect Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingLead.name || ''}
+                    onChange={(e) => setEditingLead({ ...editingLead, name: e.target.value })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Mobile Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingLead.mobile || ''}
+                    onChange={(e) => setEditingLead({ ...editingLead, mobile: e.target.value })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Call Disposition Outcome</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={editingLead.email || ''}
+                    onChange={(e) => setEditingLead({ ...editingLead, email: e.target.value })}
+                    placeholder="prospect@example.com"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Campaign Name</label>
+                  <input
+                    type="text"
+                    value={editingLead.campaign_name || ''}
+                    onChange={(e) => setEditingLead({ ...editingLead, campaign_name: e.target.value })}
+                    placeholder="e.g. Agra, WFH"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Lead Stage</label>
                   <select
-                    value={dialerForm.status}
-                    onChange={e => setDialerForm({ ...dialerForm, status: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    value={editingLead.status || 'Fresh Inquiry'}
+                    onChange={(e) => setEditingLead({ ...editingLead, status: e.target.value })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="Interested">Interested (Hot)</option>
-                    <option value="Follow Up">Follow Up Needed</option>
-                    <option value="Connected">Connected & Discussed</option>
-                    <option value="Closed">Closed (Deal Won)</option>
-                    <option value="Not Connected">Not Connected</option>
-                    <option value="Wrong Number">Wrong Number</option>
+                    {ALL_STATUS_OPTIONS.map(st => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Duration (Seconds)</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Tag</label>
+                  <select
+                    value={editingLead.priority === 'High' || editingLead.priority === 'VIP' ? 'Hot' : 'Hot'}
+                    onChange={(e) => setEditingLead({ ...editingLead, priority: e.target.value === 'Hot' ? 'VIP' : 'Normal' })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    {TAG_OPTIONS.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">User Assigned</label>
+                  <select
+                    value={editingLead.assigned_to?._id || editingLead.assigned_to || editingLead.assignedToId || ''}
+                    onChange={(e) => setEditingLead({ ...editingLead, assigned_to: e.target.value })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">Unassigned</option>
+                    {(usersList.length > 0 ? usersList : team).map(u => (
+                      <option key={u.id || u._id} value={u.id || u._id}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">City / Region</label>
                   <input
-                    type="number"
-                    min="0"
-                    value={dialerForm.duration}
-                    onChange={e => setDialerForm({ ...dialerForm, duration: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    type="text"
+                    value={editingLead.city || ''}
+                    onChange={(e) => setEditingLead({ ...editingLead, city: e.target.value })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Call Discussion Notes</label>
+                <label className="font-semibold text-slate-700 block mb-1">Discussion Notes</label>
                 <textarea
-                  rows={3}
-                  value={dialerForm.notes}
-                  onChange={e => setDialerForm({ ...dialerForm, notes: e.target.value })}
-                  placeholder="Record summary of client requirements..."
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  rows={2}
+                  value={editingLead.notes || ''}
+                  onChange={(e) => setEditingLead({ ...editingLead, notes: e.target.value })}
+                  placeholder="Record summary of client discussions..."
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={savingCall}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
-              >
-                {savingCall ? <Loader2 size={15} className="animate-spin" /> : <PhoneCall size={15} />}
-                Save Call Disposition & Update Lead
-              </button>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingLead(null)}
+                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg font-semibold text-slate-700 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold cursor-pointer transition-colors shadow-xs flex items-center gap-1.5"
+                >
+                  {savingEdit ? <Loader2 size={13} className="animate-spin" /> : null}
+                  {savingEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DRAWER: LEAD 360° INSPECTOR */}
+      {inspectorLeadId && (
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex justify-end">
+          <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+            <div className="px-6 py-5 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
+                  Lead 360° Inspector {inspectorData?.lead?.lead_id ? `• ${inspectorData.lead.lead_id}` : ''}
+                </span>
+                <h3 className="text-lg font-bold mt-0.5">{inspectorData?.lead?.name || 'Loading...'}</h3>
+              </div>
+              <button
+                onClick={() => { setInspectorLeadId(null); setInspectorData(null); }}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {loadingInspector || !inspectorData?.lead ? (
+              <div className="flex-1 flex items-center justify-center">
+                <Loader2 size={28} className="animate-spin text-blue-600" />
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex items-center gap-3">
+                  <a
+                    href={`https://wa.me/91${String(inspectorData.lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${inspectorData.lead.name} ji, regarding your inquiry.`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                  >
+                    <MessageCircle size={15} /> WhatsApp Chat
+                  </a>
+                  <button
+                    onClick={() => {
+                      setEditingLead({ ...inspectorData.lead });
+                      setInspectorLeadId(null);
+                    }}
+                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Edit3 size={15} /> Edit Details
+                  </button>
+                </div>
+
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <p className="text-slate-400 font-semibold">Mobile Number</p>
+                    <p className="font-bold text-slate-900 mt-0.5 tabular-nums">+91 {inspectorData.lead.mobile}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-semibold">Campaign Name</p>
+                    <p className="font-bold text-slate-900 mt-0.5">{inspectorData.lead.campaign_name || 'Agra'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-semibold">Assigned Telecaller</p>
+                    <p className="font-bold text-blue-600 mt-0.5">{inspectorData.lead.assigned_to?.name || 'Unassigned'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-semibold">Pipeline Stage</p>
+                    <p className="font-bold text-slate-900 mt-0.5">{inspectorData.lead.status || 'Fresh Inquiry'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-semibold">Created Date</p>
+                    <p className="font-medium text-slate-700 mt-0.5">{formatLeadDate(inspectorData.lead.createdAt)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-semibold">Last Updated</p>
+                    <p className="font-medium text-slate-700 mt-0.5">{formatLeadDate(inspectorData.lead.updatedAt || inspectorData.lead.createdAt)}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+                    Call Logs History ({inspectorData.calls?.length || 0})
+                  </h4>
+                  {(!inspectorData.calls || inspectorData.calls.length === 0) ? (
+                    <p className="text-xs text-slate-400 italic bg-slate-50 p-4 rounded-xl border border-slate-100">
+                      No calls logged yet by mobile app telecallers.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {inspectorData.calls.map((c) => (
+                        <div key={c._id} className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold text-[11px] rounded">
+                              {c.status}
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                              <Clock size={11} /> {c.duration}s • {new Date(c.start_time).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-700 font-medium">{c.notes || 'No discussion notes.'}</p>
+                          <p className="text-[10px] text-slate-400 font-semibold">Caller: {c.caller?.name || 'Telecaller'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

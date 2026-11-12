@@ -277,7 +277,7 @@ export default function MetaLeadsPage() {
               <button
                 onClick={handleRedistributeUnassigned}
                 disabled={redistributing}
-                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold rounded-xl shadow-md shadow-amber-500/25 border border-amber-400/30 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 <GitFork size={14} /> Route {kpis.unassignedCount} Unassigned
               </button>
@@ -286,17 +286,17 @@ export default function MetaLeadsPage() {
             <button
               onClick={handleSyncFromMetaForm}
               disabled={syncing}
-              className="px-4 py-2 bg-gradient-to-r from-[#1877F2] to-[#0866FF] hover:from-[#166fe5] hover:to-[#005ee5] text-white text-xs font-bold rounded-xl shadow-md shadow-blue-600/25 border border-blue-400/40 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+              className="px-4 py-2 bg-[#1877F2] hover:bg-[#166fe5] text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
             >
-              {syncing ? <Loader2 size={14} className="animate-spin text-white" /> : <Zap size={14} className="text-amber-300" />}
+              {syncing ? <Loader2 size={14} className="animate-spin text-white" /> : <RefreshCw size={14} />}
               Sync Form Leads
             </button>
 
             <Link
               href="/settings"
-              className="px-4 py-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
+              className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors"
             >
-              <Settings size={14} className="text-slate-600" /> OAuth & Form Setup
+              <Settings size={14} className="text-slate-600" /> OAuth &amp; Form Setup
             </Link>
 
             <button

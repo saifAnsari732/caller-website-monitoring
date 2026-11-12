@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   Radio,
   Users,
-  Sparkles,
   Smartphone,
   Activity
 } from 'lucide-react';
@@ -106,52 +105,38 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-[#F8FAFC]">
       {/* Left Executive Brand & Architecture Column */}
-      <div className="hidden lg:flex lg:col-span-5 bg-gradient-to-br from-[#0B1120] via-[#0F172A] to-[#1E1B4B] text-white p-10 xl:p-12 flex-col justify-between relative overflow-hidden">
-        {/* Ambient Decorative Glows */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 rounded-full bg-blue-600/20 blur-3xl"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 -right-28 w-80 h-80 rounded-full bg-indigo-500/20 blur-3xl"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -bottom-24 left-12 w-72 h-72 rounded-full bg-emerald-500/10 blur-3xl"
-        />
-
-        <div className="relative z-10">
+      <div className="hidden lg:flex lg:col-span-5 bg-[#0F172A] text-white p-10 xl:p-12 flex-col justify-between border-r border-slate-800">
+        <div>
           {/* Brand Header */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/30 border border-white/15">
-                <Building2 size={21} strokeWidth={2.2} aria-hidden="true" />
+              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-xs">
+                <Building2 size={20} strokeWidth={2.1} aria-hidden="true" />
               </div>
               <div>
                 <p className="font-heading text-base font-bold tracking-tight text-white">
                   Kisan India Pvt. Ltd.
                 </p>
-                <p className="text-xs text-slate-300 font-medium">
-                  Executive CRM & Meta Operations Console
+                <p className="text-xs text-slate-400 font-medium">
+                  Executive CRM &amp; Meta Operations Console
                 </p>
               </div>
             </div>
 
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-[11px] font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Meta v21.0 Live
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              Meta v21.0 Connected
             </span>
           </div>
 
           {/* Hero Copy */}
           <div className="mt-12 space-y-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-white/10 border border-white/15 text-blue-200 text-xs font-semibold backdrop-blur-xs">
-              <Sparkles size={13} className="text-amber-300" aria-hidden="true" />
-              <span>Instant Administrator Onboarding</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-800/90 border border-slate-700 text-blue-300 text-xs font-semibold">
+              <ShieldCheck size={13} className="text-blue-400" aria-hidden="true" />
+              <span>Administrator Account Provisioning</span>
             </div>
             <h1 className="font-heading text-3xl xl:text-[34px] font-bold tracking-tight text-white leading-[1.2]">
-              Launch your executive command account in seconds.
+              Set up your executive command account.
             </h1>
             <p className="text-sm text-slate-300 leading-relaxed max-w-md">
               Create your Administrator profile to supervise live Facebook &amp; Instagram lead capture, orchestrate telecaller distribution, and monitor real-time campaign ROI.
@@ -160,43 +145,43 @@ export default function RegisterPage() {
 
           {/* Feature Highlight Cards */}
           <div className="mt-9 space-y-3.5">
-            <div className="p-4 rounded-2xl bg-white/[0.06] border border-white/10 backdrop-blur-xs flex items-start gap-3.5 hover:bg-white/[0.09] transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-blue-600/25">
-                <Radio size={18} aria-hidden="true" />
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-start gap-3.5">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-400/20 flex items-center justify-center text-blue-400 shrink-0">
+                <Radio size={17} aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">
                   Zero-Loss Meta Lead Ads Ingestion
                 </p>
-                <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
                   Real-time Graph API v21.0 sync &amp; webhook capture directly from connected Facebook &amp; Instagram forms.
                 </p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white/[0.06] border border-white/10 backdrop-blur-xs flex items-start gap-3.5 hover:bg-white/[0.09] transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-emerald-600/25">
-                <Users size={18} aria-hidden="true" />
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-start gap-3.5">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-400/20 flex items-center justify-center text-emerald-400 shrink-0">
+                <Users size={17} aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">
-                  Smart Round-Robin Telecaller Floor
+                  Automated Round-Robin Telecaller Floor
                 </p>
-                <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
                   Automated cyclic lead assignment, SLA callback alerts, and live mobile app disposition tracking.
                 </p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white/[0.06] border border-white/10 backdrop-blur-xs flex items-start gap-3.5 hover:bg-white/[0.09] transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-amber-600/25">
-                <ShieldCheck size={18} aria-hidden="true" />
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-start gap-3.5">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-400/20 flex items-center justify-center text-indigo-400 shrink-0">
+                <ShieldCheck size={17} aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">
                   Direct Encrypted Admin Access
                 </p>
-                <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
                   Protected with bcrypt credential hashing and HttpOnly JWT sessions with instant workspace sign-in upon registration.
                 </p>
               </div>
@@ -205,15 +190,9 @@ export default function RegisterPage() {
         </div>
 
         {/* Footer Note */}
-        <div className="relative z-10 pt-6 border-t border-white/10 flex items-center justify-between gap-4 text-xs text-slate-300">
-          <div className="flex items-center gap-2">
-            <Smartphone size={15} className="text-blue-400 shrink-0" aria-hidden="true" />
-            <span>Telecaller agents are provisioned inside the Telecallers console.</span>
-          </div>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/10 text-[11px] font-semibold text-slate-200 shrink-0">
-            <Activity size={12} className="text-emerald-400" aria-hidden="true" />
-            v4.2
-          </span>
+        <div className="pt-6 border-t border-slate-800 flex items-center gap-2.5 text-xs text-slate-400">
+          <Smartphone size={15} className="text-slate-400 shrink-0" aria-hidden="true" />
+          <span>Telecaller agents are provisioned inside the Telecallers console.</span>
         </div>
       </div>
 
@@ -231,7 +210,7 @@ export default function RegisterPage() {
             </Link>
 
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50/80 border border-blue-200/70">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-2xs">
+              <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-2xs">
                 <Building2 size={13} aria-hidden="true" />
               </div>
               <span className="font-heading text-xs font-bold text-slate-900">
@@ -241,15 +220,12 @@ export default function RegisterPage() {
           </div>
 
           {/* Main Registration Card */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-[0_20px_50px_-12px_rgba(15,23,42,0.08)] overflow-hidden">
-            {/* Top Colorful Accent Bar */}
-            <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500" />
-
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
             <div className="p-6 sm:p-8 space-y-6">
               {/* Card Header */}
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 text-blue-700 text-[11px] font-bold tracking-wide uppercase">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-700 text-[11px] font-bold tracking-wide uppercase">
                     <ShieldCheck size={13} className="text-blue-600" aria-hidden="true" />
                     <span>Administrator Registration</span>
                   </span>
@@ -489,12 +465,12 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                {/* Colorful Gradient Box Submit Button */}
+                {/* Submit Button */}
                 <div className="pt-2">
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full py-3 px-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:via-indigo-700 hover:to-blue-800 disabled:opacity-60 text-white font-semibold text-sm rounded-xl shadow-md shadow-blue-600/25 hover:shadow-lg hover:shadow-indigo-600/30 border border-blue-500/30 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3 px-5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {submitting ? (
                       <>

@@ -200,7 +200,7 @@ export default function TelecallerManagementPage() {
                                   {t.employee_id || 'EMP'}
                                 </span>
                               </div>
-                              <div className="text-[11px] text-slate-400 font-medium">+91 {t.mobile} • {t.team}</div>
+                              <div className="text-[11px] text-slate-400 font-medium">+91 {t.mobile} â€¢ {t.team}</div>
                             </div>
                           </td>
 
@@ -341,7 +341,7 @@ export default function TelecallerManagementPage() {
 
                   <div>
                     <h4 className="text-base font-extrabold text-slate-900">{agent.name}</h4>
-                    <p className="text-xs text-slate-500 font-medium">{agent.todaysCalls} Calls • {agent.connected} Connected • Avg {agent.avgCallDurationSec}s</p>
+                    <p className="text-xs text-slate-500 font-medium">{agent.todaysCalls} Calls â€¢ {agent.connected} Connected â€¢ Avg {agent.avgCallDurationSec}s</p>
                   </div>
 
                   <div className="pt-3 border-t border-slate-200/80 flex items-center justify-between text-xs font-bold">
@@ -378,14 +378,14 @@ export default function TelecallerManagementPage() {
         {/* Selected Telecaller Profile Modal */}
         {selectedCaller && (
           <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 relative border border-slate-200">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 relative border border-slate-200">
               <button onClick={() => setSelectedCaller(null)} className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 hover:bg-slate-200 cursor-pointer">
                 <X size={16} />
               </button>
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">{selectedCaller.team}</span>
                 <h3 className="text-lg font-extrabold text-slate-900">{selectedCaller.name}</h3>
-                <p className="text-xs text-slate-500">+91 {selectedCaller.mobile} • {selectedCaller.email}</p>
+                <p className="text-xs text-slate-500">+91 {selectedCaller.mobile} â€¢ {selectedCaller.email}</p>
               </div>
               <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
                 <div>
@@ -412,7 +412,7 @@ export default function TelecallerManagementPage() {
         {/* Onboard New Agent Modal */}
         {showAddModal && (
           <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 relative border border-slate-200">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 relative border border-slate-200">
               <button onClick={() => setShowAddModal(false)} className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 hover:bg-slate-200 cursor-pointer">
                 <X size={16} />
               </button>

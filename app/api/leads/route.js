@@ -57,19 +57,24 @@ export async function GET(request) {
     const callerId = searchParams.get('callerId') || '';
     const campaign = searchParams.get('campaign') || '';
     const source = searchParams.get('source') || '';
+    const dateRange = searchParams.get('dateRange') || '';
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.max(1, Math.min(200, parseInt(searchParams.get('limit') || '50', 10)));
+    const skip = (page - 1) * limit;
 
     const query = {};
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
         { mobile: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
         { lead_id: { $regex: search, $options: 'i' } },
         { city: { $regex: search, $options: 'i' } },
         { product_interest: { $regex: search, $options: 'i' } },
         { campaign_name: { $regex: search, $options: 'i' } }
       ];
     }
-    if (status) query.status = status;
+    if (status && status !== 'ALL') query.status = status;
     if (source && source !== 'ALL') {
       query.lead_source = { $regex: source, $options: 'i' };
     }
@@ -84,20 +89,48 @@ export async function GET(request) {
         }
       ];
     }
-    if (callerId) {
+    if (callerId && callerId !== 'ALL') {
       query.assigned_to = callerId === 'UNASSIGNED' ? null : callerId;
     }
+    if (dateRange && dateRange !== 'ALL') {
+      const now = new Date();
+      if (dateRange === 'today') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        query.createdAt = { $gte: start };
+      } else if (dateRange === 'yesterday') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        query.createdAt = { $gte: start, $lt: end };
+      } else if (dateRange === 'last7') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        query.createdAt = { $gte: start };
+      } else if (dateRange === 'last30') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+        query.createdAt = { $gte: start };
+      }
+    }
 
-    const [leads, users] = await Promise.all([
+    const [total, leads, users, distinctCampaigns] = await Promise.all([
+      Lead.countDocuments(query),
       Lead.find(query)
         .sort({ createdAt: -1 })
-        .limit(200)
-        .populate('assigned_to', 'name _id mobile')
+        .skip(skip)
+        .limit(limit)
+        .populate('assigned_to', 'name _id mobile employee_id')
         .lean(),
-      User.find({ role: 'telecaller' }).select('name _id mobile team on_leave shift_status').lean()
+      User.find({ role: 'telecaller' }).select('name _id mobile team on_leave shift_status').lean(),
+      Lead.distinct('campaign_name', { campaign_name: { $ne: '' } })
     ]);
 
-    return NextResponse.json({ leads, users });
+    return NextResponse.json({
+      leads,
+      users,
+      campaigns: distinctCampaigns.filter(Boolean),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     console.error('Leads GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
@@ -253,26 +286,42 @@ export async function PATCH(request) {
         }
       }
 
+      const updateSet = {};
+      if (body.assigned_to !== undefined) {
+        updateSet.assigned_to = body.assigned_to || null;
+        updateSet.assigned_at = body.assigned_to ? new Date() : null;
+        if (!body.status) {
+          updateSet.status = body.assigned_to ? 'Assigned' : 'Fresh Lead';
+        }
+      }
+      if (body.status) {
+        updateSet.status = body.status;
+      }
+      if (Object.keys(updateSet).length === 0) {
+        updateSet.status = 'Fresh Lead';
+      }
+
       await Lead.updateMany(
         { _id: { $in: body.leadIds } },
-        {
-          $set: {
-            assigned_to: body.assigned_to || null,
-            assigned_at: body.assigned_to ? new Date() : null,
-            status: body.assigned_to ? 'Assigned' : 'Fresh Lead'
-          }
-        }
+        { $set: updateSet }
       );
       purgeDashboardCache();
       return NextResponse.json({ success: true, count: body.leadIds.length });
     }
 
-    const { leadId, assigned_to, status, notes, priority } = body;
+    const { leadId, name, mobile, email, city, state, campaign_name, tags, assigned_to, status, notes, priority } = body;
     if (!leadId) {
       return NextResponse.json({ error: 'Lead ID required' }, { status: 400 });
     }
 
     const updateData = {};
+    if (name !== undefined) updateData.name = String(name).trim();
+    if (mobile !== undefined) updateData.mobile = String(mobile).trim();
+    if (email !== undefined) updateData.email = String(email).trim();
+    if (city !== undefined) updateData.city = String(city).trim();
+    if (state !== undefined) updateData.state = String(state).trim();
+    if (campaign_name !== undefined) updateData.campaign_name = String(campaign_name).trim();
+    if (tags !== undefined) updateData.tags = Array.isArray(tags) ? tags : [tags];
     if (assigned_to !== undefined) {
       updateData.assigned_to = assigned_to || null;
       updateData.assigned_at = assigned_to ? new Date() : null;
@@ -293,5 +342,22 @@ export async function PATCH(request) {
   } catch (error) {
     console.error('Leads PATCH error:', error);
     return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    if (!(await requireAdminApi(request))) {
+      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    }
+    await connectDB();
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Lead ID required' }, { status: 400 });
+    await Lead.findByIdAndDelete(id);
+    purgeDashboardCache();
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

@@ -12,7 +12,8 @@ import {
   Loader2,
   X,
   CheckCircle2,
-  User
+  User,
+  Plus
 } from 'lucide-react';
 
 const OUTCOME_BADGE = {
@@ -40,8 +41,8 @@ export default function CallsPage() {
   const [search, setSearch] = useState('');
   const [playingId, setPlayingId] = useState(null);
 
-  // Click-to-Call Dialer Modal
-  const [showDialModal, setShowDialModal] = useState(false);
+  // Offline Call Logging Modal
+  const [showLogCallModal, setShowLogCallModal] = useState(false);
   const [dialForm, setDialForm] = useState({
     leadId: '',
     callerId: '',
@@ -75,7 +76,7 @@ export default function CallsPage() {
     fetchCalls();
   }, [fetchCalls]);
 
-  const handleLogDialerCall = async (e) => {
+  const handleLogOfflineCall = async (e) => {
     e.preventDefault();
     if (!dialForm.leadId || !dialForm.callerId) return;
     setSubmitting(true);
@@ -87,7 +88,7 @@ export default function CallsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setShowDialModal(false);
+        setShowLogCallModal(false);
         setDialForm({ leadId: '', callerId: '', duration: 135, status: 'Interested', notes: '' });
         fetchCalls();
       }
@@ -157,11 +158,11 @@ export default function CallsPage() {
                   status: 'Interested',
                   notes: ''
                 });
-                setShowDialModal(true);
+                setShowLogCallModal(true);
               }}
               className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
             >
-              <PhoneCall size={15} /> Log Click-to-Call Disposition
+              <Plus size={15} /> Log Offline Call Record
             </button>
           </div>
         </div>
@@ -283,7 +284,7 @@ export default function CallsPage() {
                         <td className="py-4 px-6">
                           <p className="font-semibold text-slate-900">{log.leadName}</p>
                           <p className="text-[11px] text-slate-500 mt-0.5 tabular-nums">
-                            {log.leadId ? `${log.leadId} • ` : ''}+91 {log.leadMobile}
+                            {log.leadId ? `${log.leadId} â€¢ ` : ''}+91 {log.leadMobile}
                           </p>
                         </td>
                         <td className="py-4 px-6 whitespace-nowrap">
@@ -327,21 +328,21 @@ export default function CallsPage() {
         </div>
       </main>
 
-      {/* Click-to-Call Disposition Modal */}
-      {showDialModal && (
+      {/* Offline Call Logging Modal */}
+      {showLogCallModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 relative">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 relative">
             <button
-              onClick={() => setShowDialModal(false)}
+              onClick={() => setShowLogCallModal(false)}
               className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer"
             >
               <X size={16} />
             </button>
             <div>
-              <h3 className="text-lg font-heading font-bold text-slate-900">Log Call & Lead Disposition</h3>
-              <p className="text-xs text-slate-500 font-medium">Saves call record to MongoDB and updates lead status automatically</p>
+              <h3 className="text-lg font-heading font-bold text-slate-900">Log Offline Call Record</h3>
+              <p className="text-xs text-slate-500 font-medium">Record offline phone call discussion and disposition notes to CRM</p>
             </div>
-            <form onSubmit={handleLogDialerCall} className="space-y-3.5 text-xs">
+            <form onSubmit={handleLogOfflineCall} className="space-y-3.5 text-xs">
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Select Prospect Lead *</label>
                 <select
@@ -351,7 +352,7 @@ export default function CallsPage() {
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
                   {leads.map(l => (
-                    <option key={l.id} value={l.id}>{l.lead_id} — {l.name} (+91 {l.mobile})</option>
+                    <option key={l.id} value={l.id}>{l.lead_id} â€” {l.name} (+91 {l.mobile})</option>
                   ))}
                 </select>
               </div>

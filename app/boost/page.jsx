@@ -204,7 +204,7 @@ export default function BoostPage() {
               return (
                 <div
                   key={c.campaignId}
-                  className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between"
+                  className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between"
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
@@ -243,7 +243,7 @@ export default function BoostPage() {
                       <div>
                         <div className="text-[10px] font-bold text-slate-400 uppercase">Spend</div>
                         <div className="text-xs font-heading font-extrabold text-slate-900 mt-0.5">
-                          ₹{c.spend ? Number(c.spend).toFixed(0) : 0}
+                          â‚¹{c.spend ? Number(c.spend).toFixed(0) : 0}
                         </div>
                       </div>
                       <div>
@@ -255,7 +255,7 @@ export default function BoostPage() {
                       <div>
                         <div className="text-[10px] font-bold text-slate-400 uppercase">Daily Budget</div>
                         <div className="text-xs font-heading font-extrabold text-slate-900 mt-0.5">
-                          {currentBudget > 0 ? `₹${currentBudget}` : 'AdSet'}
+                          {currentBudget > 0 ? `â‚¹${currentBudget}` : 'AdSet'}
                         </div>
                       </div>
                     </div>
@@ -263,15 +263,15 @@ export default function BoostPage() {
                     {/* Budget Input / Multiplier Target */}
                     <div className="p-3 rounded-2xl bg-blue-50/60 border border-blue-100 text-xs text-blue-900 space-y-2">
                       <div className="flex items-center justify-between font-bold">
-                        <span>Target Daily Budget (₹):</span>
+                        <span>Target Daily Budget (â‚¹):</span>
                         <span className="text-blue-700 font-extrabold">
-                          {targetBudget > 0 ? `₹${targetBudget}/day` : 'AdSet Scale'}
+                          {targetBudget > 0 ? `â‚¹${targetBudget}/day` : 'AdSet Scale'}
                         </span>
                       </div>
                       <input
                         type="number"
                         min="0"
-                        placeholder={currentBudget > 0 ? `Custom ₹ (or ${selectedMultiplier}x = ₹${Math.round(currentBudget * selectedMultiplier)})` : 'Set custom daily budget (INR)'}
+                        placeholder={currentBudget > 0 ? `Custom â‚¹ (or ${selectedMultiplier}x = â‚¹${Math.round(currentBudget * selectedMultiplier)})` : 'Set custom daily budget (INR)'}
                         value={customBudgets[c.campaignId] || ''}
                         onChange={(e) => setCustomBudgets(prev => ({ ...prev, [c.campaignId]: e.target.value }))}
                         className="w-full px-3 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -288,20 +288,20 @@ export default function BoostPage() {
                     <button
                       onClick={() => handleBoostCampaign(c, selectedMultiplier)}
                       disabled={isBoosting}
-                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold shadow-md shadow-amber-500/25 border border-amber-300/40 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                      className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                     >
                       {isBoosting ? (
                         <Loader2 size={14} className="animate-spin text-white" />
                       ) : (
-                        <Zap size={14} className="fill-white" />
+                        <Zap size={14} />
                       )}
-                      <span>{targetBudget > 0 ? `1-Click Scale to ₹${targetBudget}/day` : `1-Click Scale (${selectedMultiplier}x)`}</span>
+                      <span>{targetBudget > 0 ? `1-Click Scale to â‚¹${targetBudget}/day` : `1-Click Scale (${selectedMultiplier}x)`}</span>
                     </button>
 
                     <button
                       onClick={() => handleAccelerateLeads(c)}
                       disabled={isBoosting}
-                      className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                      className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <RefreshCw size={12} className="text-slate-600" />
                       <span>Accelerate Real Lead Sync</span>

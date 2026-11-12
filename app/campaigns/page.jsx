@@ -177,67 +177,67 @@ export default function CampaignsPage() {
         )}
 
         {/* Live Meta Ad Account Sync Banner */}
-        <div className="bg-gradient-to-r from-[#1877F2]/10 via-purple-50 to-blue-50 border border-[#1877F2]/20 rounded-3xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div className="crm-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#1877F2] text-white flex items-center justify-center shrink-0 shadow-md">
-              <Facebook size={26} />
+            <div className="w-12 h-12 rounded-2xl bg-[#1877F2] text-white flex items-center justify-center shrink-0 shadow-sm">
+              <Facebook size={24} />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-heading font-extrabold text-slate-900">
-                  {metaData?.pageName || 'Kisan Choice'} • Meta Ads Account
+                  {metaData?.pageName || 'Kisan Choice'} Â· Meta Ads Account
                 </h2>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                   Connected
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold border border-blue-200">
+                <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
                   ID: {metaData?.adAccountId || 'act_1796071777698019'}
                 </span>
               </div>
-              <p className="text-xs text-slate-600 mt-1 font-medium">
+              <p className="text-xs text-slate-500 mt-1 font-medium">
                 Live synchronization of all ad campaigns, leadgen forms, and prospect leads into MongoDB with automatic round-robin routing.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
             <button
               onClick={handleSyncAllFromMeta}
               disabled={syncingMeta}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1877F2] to-[#0866FF] hover:from-[#166fe5] hover:to-[#005ee5] text-white font-bold text-xs shadow-md shadow-blue-600/25 border border-blue-400/40 flex items-center gap-2 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+              className="px-4 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white font-semibold text-xs shadow-xs flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
             >
               {syncingMeta ? (
                 <>
-                  <Loader2 size={16} className="animate-spin text-white" /> Syncing All Campaigns & Leads...
+                  <Loader2 size={15} className="animate-spin text-white" /> Syncing Campaigns...
                 </>
               ) : (
                 <>
-                  <RefreshCw size={15} /> Sync All Campaigns from Meta
+                  <RefreshCw size={15} /> Sync Campaigns from Meta
                 </>
               )}
             </button>
             <Link
               href="/goal"
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 border border-blue-200/80 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors"
             >
               <Target size={14} className="text-blue-600" /> Goals Hub
             </Link>
             <Link
               href="/boost"
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 text-amber-700 border border-amber-200/80 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors"
             >
-              <Zap size={14} className="text-amber-500" /> Boost Budget
+              <Zap size={14} className="text-amber-600" /> Boost Budget
             </Link>
             <Link
               href="/browser"
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 text-purple-700 border border-purple-200/80 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors"
             >
-              <FileSpreadsheet size={14} className="text-purple-600" /> Forms Browser
+              <FileSpreadsheet size={14} className="text-indigo-600" /> Forms Browser
             </Link>
             <Link
               href="/settings"
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
+              className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors"
             >
               OAuth Settings
             </Link>
@@ -266,7 +266,7 @@ export default function CampaignsPage() {
               <DollarSign size={18} className="text-emerald-600" />
             </div>
             <p className="text-3xl font-heading font-extrabold text-emerald-600 tabular-nums">
-              ₹{(metaData?.totalSpend || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+              â‚¹{(metaData?.totalSpend || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
             </p>
             <p className="text-[11px] text-slate-400 mt-1">Total investment across campaigns</p>
           </div>
@@ -297,9 +297,9 @@ export default function CampaignsPage() {
         <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
           <button
             onClick={() => setActiveTab('META_SYNC')}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95 ${
+            className={`px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 cursor-pointer transition-all ${
               activeTab === 'META_SYNC'
-                ? 'bg-gradient-to-r from-[#1877F2] to-[#0866FF] text-white shadow-md shadow-blue-500/25 border border-blue-400/40'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
             }`}
           >
@@ -308,13 +308,13 @@ export default function CampaignsPage() {
           </button>
           <button
             onClick={() => setActiveTab('ALL_CAMPAIGNS')}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95 ${
+            className={`px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 cursor-pointer transition-all ${
               activeTab === 'ALL_CAMPAIGNS'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/25 border border-purple-400/40'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
             }`}
           >
-            <Layers size={14} className={activeTab === 'ALL_CAMPAIGNS' ? 'text-purple-100' : 'text-purple-600'} />
+            <Layers size={14} className={activeTab === 'ALL_CAMPAIGNS' ? 'text-blue-100' : 'text-slate-600'} />
             Campaign Pipeline Conversion ({campaigns.length})
           </button>
         </div>
@@ -419,9 +419,9 @@ export default function CampaignsPage() {
                         </td>
                         <td className="py-4 px-6 whitespace-nowrap tabular-nums">
                           {camp.spend > 0 ? (
-                            <span className="font-semibold text-slate-900">₹{camp.spend.toLocaleString('en-IN')}</span>
+                            <span className="font-semibold text-slate-900">â‚¹{camp.spend.toLocaleString('en-IN')}</span>
                           ) : camp.dailyBudget > 0 ? (
-                            <span className="text-slate-600">₹{camp.dailyBudget}/day</span>
+                            <span className="text-slate-600">â‚¹{camp.dailyBudget}/day</span>
                           ) : (
                             <span className="text-slate-400 font-normal">Auto</span>
                           )}
@@ -540,7 +540,7 @@ export default function CampaignsPage() {
       {/* Link New Campaign Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 relative">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 relative">
             <button
               onClick={() => setShowModal(false)}
               className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer"
