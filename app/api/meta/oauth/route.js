@@ -243,14 +243,18 @@ export async function POST(request) {
     if (!settings) settings = new SystemSetting({ key: 'global' });
 
     settings.metaConfig = {
+      ...(settings.metaConfig?.toObject?.() || settings.metaConfig),
+      integrationMode: 'OAUTH',
       connected: true,
       appId: DEFAULT_APP_ID,
+      appSecret: process.env.META_APP_SECRET || settings.metaConfig?.appSecret || '',
       pageId: targetPageId,
       pageName: targetPageName,
       adAccountId: DEFAULT_AD_ACCOUNT_ID,
       accessToken: targetPageToken,
       userAccessToken: userOrInputToken,
       verifyToken: process.env.META_VERIFY_TOKEN || settings.metaConfig?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY',
+      webhookUrl: settings.metaConfig?.webhookUrl || '',
       webhookSubscribed: webhookSubscribed || true,
       autoSyncEnabled: true,
       zeroLossFallback: true,

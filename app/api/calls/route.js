@@ -3,6 +3,9 @@ import connectDB from '../../../lib/db';
 import Call from '../../../lib/models/Call';
 import User from '../../../lib/models/User';
 import Lead from '../../../lib/models/Lead';
+import Followup from '../../../lib/models/Followup';
+import LeadActivity from '../../../lib/models/LeadActivity';
+import { normalizeStage } from '../../../lib/leadDispositions';
 import { purgeDashboardCache } from '../../../lib/cache';
 import { requireAdminApi } from '../../../lib/auth';
 
@@ -137,7 +140,17 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     await connectDB();
-    const { leadId, callerId, duration, status, notes } = await request.json();
+    const {
+      leadId,
+      callerId,
+      duration,
+      status,
+      notes,
+      sub_disposition,
+      recording_url,
+      followup_date,
+      followup_time
+    } = await request.json();
     if (!leadId || !callerId) {
       return NextResponse.json({ error: 'Lead and Telecaller are required' }, { status: 400 });
     }
@@ -146,26 +159,109 @@ export async function POST(request) {
     const now = new Date();
     const startTime = new Date(now.getTime() - durSec * 1000);
 
+    const caller = await User.findById(callerId).select('name mobile').lean();
+    const normStatus = normalizeStage(status || 'Contacted');
+
     const call = await Call.create({
       lead: leadId,
       caller: callerId,
       start_time: startTime,
       end_time: now,
       duration: durSec,
-      status: status || 'Interested',
-      notes: notes || ''
+      status: normStatus,
+      recording_url: recording_url || null,
+      notes: notes || '',
+      followup_date: followup_date || null,
+      followup_time: followup_time || null
     });
 
-    await Lead.findByIdAndUpdate(leadId, {
-      $set: {
-        status: status || 'Interested',
-        last_contacted_at: now
+    const leadUpdate = {
+      status: normStatus,
+      last_contacted_at: now
+    };
+    if (sub_disposition) leadUpdate.sub_disposition = sub_disposition;
+    if (followup_date) {
+      const parsedFollowup = new Date(`${followup_date}T${followup_time || '10:00'}:00`);
+      if (!isNaN(parsedFollowup.getTime())) {
+        leadUpdate.follow_up_time = parsedFollowup;
+      }
+    }
+
+    const updatedLead = await Lead.findByIdAndUpdate(
+      leadId,
+      {
+        $set: leadUpdate,
+        $inc: { call_attempts: 1 }
       },
-      $inc: { call_attempts: 1 }
-    });
+      { new: true }
+    );
+
+    // 1. Log CALL_LOGGED in LeadActivity
+    await LeadActivity.create({
+      lead: leadId,
+      admin_id: updatedLead?.admin_id || null,
+      performed_by: callerId,
+      performer_name: caller?.name || 'Telecaller',
+      performer_role: 'telecaller',
+      type: 'CALL_LOGGED',
+      title: `Call Logged: ${formatDuration(durSec)} • Outcome: ${normStatus}`,
+      description: notes || `Call duration ${durSec}s with disposition: ${normStatus}`,
+      metadata: {
+        durationSec: durSec,
+        durationFormatted: formatDuration(durSec),
+        status: normStatus,
+        recording_url: recording_url || null
+      }
+    }).catch(() => {});
+
+    // 2. Log DISPOSITION_LOGGED in LeadActivity
+    await LeadActivity.create({
+      lead: leadId,
+      admin_id: updatedLead?.admin_id || null,
+      performed_by: callerId,
+      performer_name: caller?.name || 'Telecaller',
+      performer_role: 'telecaller',
+      type: 'DISPOSITION_LOGGED',
+      title: `Disposition Recorded: ${normStatus}`,
+      description: `Telecaller marked lead as "${normStatus}". ${sub_disposition ? `Sub-disposition: ${sub_disposition}` : ''}`,
+      metadata: {
+        status: normStatus,
+        sub_disposition: sub_disposition || '',
+        notes: notes || ''
+      }
+    }).catch(() => {});
+
+    // 3. Create Followup if scheduled
+    let followup = null;
+    if (followup_date) {
+      followup = await Followup.create({
+        lead: leadId,
+        caller: callerId,
+        admin_id: updatedLead?.admin_id || null,
+        date: followup_date,
+        time: followup_time || '10:00 AM',
+        notes: notes || `Scheduled callback: ${normStatus}`
+      });
+
+      await LeadActivity.create({
+        lead: leadId,
+        admin_id: updatedLead?.admin_id || null,
+        performed_by: callerId,
+        performer_name: caller?.name || 'Telecaller',
+        performer_role: 'telecaller',
+        type: 'FOLLOWUP_SCHEDULED',
+        title: `Follow-up Scheduled for ${followup_date} at ${followup_time || '10:00 AM'}`,
+        description: `Follow-up set by ${caller?.name || 'Telecaller'}. Notes: ${notes || 'No extra notes.'}`,
+        metadata: {
+          date: followup_date,
+          time: followup_time || '10:00 AM',
+          followup_id: followup._id
+        }
+      }).catch(() => {});
+    }
 
     purgeDashboardCache();
-    return NextResponse.json({ success: true, call }, { status: 201 });
+    return NextResponse.json({ success: true, call, followup, lead: updatedLead }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

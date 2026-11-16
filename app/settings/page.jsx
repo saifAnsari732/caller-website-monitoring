@@ -36,7 +36,11 @@ import {
   Radio,
   FileSpreadsheet,
   Cpu,
-  Save
+  Save,
+  Eye,
+  EyeOff,
+  UserCheck,
+  Share2
 } from 'lucide-react';
 
 const CRM_FIELDS = [
@@ -56,7 +60,8 @@ export default function SettingsPage() {
   const [banner, setBanner] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [formFilter, setFormFilter] = useState('ALL'); // 'ALL' | 'WITH_LEADS' | 'ACTIVE' | 'PAUSED'
-  const [activeTab, setActiveTab] = useState('FORMS'); // 'FORMS' | 'CAPI' | 'QUALITY' | 'WEBHOOK' | 'DIAGNOSTICS'
+  const [activeTab, setActiveTab] = useState('INTEGRATION'); // 'INTEGRATION' | 'FORMS' | 'CAPI' | 'QUALITY' | 'WEBHOOK' | 'DIAGNOSTICS'
+  const [integrationModeTab, setIntegrationModeTab] = useState('OAUTH'); // 'OAUTH' | 'MANUAL'
 
   // Sync states
   const [syncingFormId, setSyncingFormId] = useState(null);
@@ -69,10 +74,34 @@ export default function SettingsPage() {
   const [availableQuestions, setAvailableQuestions] = useState([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
-  // Token input state
-  const [customToken, setCustomToken] = useState('');
-  const [savingFb, setSavingFb] = useState(false);
-  const [showTokenInput, setShowTokenInput] = useState(false);
+  // Manual Setup State
+  const [manualToken, setManualToken] = useState('');
+  const [manualAppId, setManualAppId] = useState('1007200718473332');
+  const [manualAppSecret, setManualAppSecret] = useState('');
+  const [manualPageId, setManualPageId] = useState('933429549844450');
+  const [manualPageName, setManualPageName] = useState('Kisan Choice');
+  const [manualAdAccountId, setManualAdAccountId] = useState('act_1796071777698019');
+  const [manualFormId, setManualFormId] = useState('');
+  const [manualVerifyToken, setManualVerifyToken] = useState('KISAN_META_WEBHOOK_VERIFY');
+  const [manualWebhookUrl, setManualWebhookUrl] = useState('');
+  const [showManualToken, setShowManualToken] = useState(false);
+  const [showManualSecret, setShowManualSecret] = useState(false);
+  const [testingManual, setTestingManual] = useState(false);
+  const [manualTestResult, setManualTestResult] = useState(null);
+  const [savingManual, setSavingManual] = useState(false);
+
+  // Test Lead Webhook Sender State
+  const [testLeadModalOpen, setTestLeadModalOpen] = useState(false);
+  const [testLeadFormId, setTestLeadFormId] = useState('');
+  const [testLeadName, setTestLeadName] = useState('Vikramaditya Verma');
+  const [testLeadPhone, setTestLeadPhone] = useState('9876543299');
+  const [testLeadEmail, setTestLeadEmail] = useState('vikram.verma@example.com');
+  const [testLeadCity, setTestLeadCity] = useState('Varanasi');
+  const [testLeadState, setTestLeadState] = useState('Uttar Pradesh');
+  const [testLeadBusiness, setTestLeadBusiness] = useState('Exclusive Dealership / Distributor');
+  const [testLeadProduct, setTestLeadProduct] = useState('Mustard Oil (15L Tin) Bulk Dealership');
+  const [sendingTestLead, setSendingTestLead] = useState(false);
+  const [testLeadResult, setTestLeadResult] = useState(null);
 
   // Field mapping state for currently edited form
   const [currentMapping, setCurrentMapping] = useState({});
@@ -102,6 +131,145 @@ export default function SettingsPage() {
   const [tokenHealth, setTokenHealth] = useState(null);
   const [loadingHealth, setLoadingHealth] = useState(false);
 
+  // NeoDove & Multi-Webhook Hub State
+  const [neodoveConfig, setNeodoveConfig] = useState({
+    enabled: false,
+    webhookUrl: '',
+    apiKey: '',
+    secretToken: 'NEODOVE_CRM_SECRET_2026',
+    autoSync: false,
+    leadsCaptured: 0,
+    leadsSyncedOut: 0
+  });
+  const [savingNeoConfig, setSavingNeoConfig] = useState(false);
+  const [testingNeoSync, setTestingNeoSync] = useState(false);
+  const [simulatingNeoInbound, setSimulatingNeoInbound] = useState(false);
+  const [simulatingWebInbound, setSimulatingWebInbound] = useState(false);
+  const [neoSimResult, setNeoSimResult] = useState(null);
+  const [webSimResult, setWebSimResult] = useState(null);
+  const [neoSimForm, setNeoSimForm] = useState({
+    name: 'Vikram Singh (Distributor)',
+    mobile: '9826012345',
+    city: 'Gwalior',
+    state: 'Madhya Pradesh',
+    campaign_name: 'NeoDove Oil Inflow',
+    stage: 'Interested'
+  });
+  const [webSimForm, setWebSimForm] = useState({
+    name: 'Pooja Sharma',
+    mobile: '9893012345',
+    city: 'Bhopal',
+    state: 'Madhya Pradesh',
+    campaign_name: 'Google Ads Landing Page',
+    lead_source: 'Website Landing Page'
+  });
+
+  const fetchNeoConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/integrations/neodove');
+      const data = await res.json();
+      if (data.config) {
+        setNeodoveConfig(data.config);
+      }
+    } catch (e) {
+      console.error('Fetch NeoDove config error:', e);
+    }
+  }, []);
+
+  const handleSaveNeoConfig = async (e) => {
+    e?.preventDefault();
+    setSavingNeoConfig(true);
+    try {
+      const res = await fetch('/api/integrations/neodove', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(neodoveConfig)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('NeoDove CRM synchronization settings saved successfully!');
+        fetchNeoConfig();
+      } else {
+        showToast('Failed to save NeoDove settings: ' + (data.error || 'Unknown error'));
+      }
+    } catch (e) {
+      showToast('Error saving settings: ' + e.message);
+    } finally {
+      setSavingNeoConfig(false);
+    }
+  };
+
+  const handleTestNeoSync = async () => {
+    setTestingNeoSync(true);
+    try {
+      const res = await fetch('/api/integrations/neodove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testLead: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('NeoDove Ping Dispatched! Response: ' + JSON.stringify(data.syncResult?.statusCode || 'OK'));
+        fetchNeoConfig();
+      } else {
+        showToast('NeoDove test failed: ' + (data.syncResult?.error || data.error || 'Check webhook URL'));
+      }
+    } catch (e) {
+      showToast('Connection test error: ' + e.message);
+    } finally {
+      setTestingNeoSync(false);
+    }
+  };
+
+  const handleSimulateNeoLead = async (e) => {
+    e.preventDefault();
+    setSimulatingNeoInbound(true);
+    setNeoSimResult(null);
+    try {
+      const res = await fetch('/api/webhooks/neodove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(neoSimForm)
+      });
+      const data = await res.json();
+      setNeoSimResult(data);
+      if (data.success) {
+        showToast(`NeoDove Inbound Simulated! Lead ${data.results?.[0]?.lead_id} assigned to ${data.results?.[0]?.assigned_to}`);
+        fetchNeoConfig();
+      } else {
+        showToast('Simulation failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch (e) {
+      showToast('Simulation error: ' + e.message);
+    } finally {
+      setSimulatingNeoInbound(false);
+    }
+  };
+
+  const handleSimulateWebLead = async (e) => {
+    e.preventDefault();
+    setSimulatingWebInbound(true);
+    setWebSimResult(null);
+    try {
+      const res = await fetch('/api/webhooks/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(webSimForm)
+      });
+      const data = await res.json();
+      setWebSimResult(data);
+      if (data.success) {
+        showToast(`Landing Page Lead Simulated! Lead ${data.results?.[0]?.lead_id} assigned to ${data.results?.[0]?.assigned_to}`);
+      } else {
+        showToast('Simulation failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch (e) {
+      showToast('Simulation error: ' + e.message);
+    } finally {
+      setSimulatingWebInbound(false);
+    }
+  };
+
   const showToast = (msg) => {
     setBanner(msg);
     setTimeout(() => setBanner(null), 6000);
@@ -112,6 +280,17 @@ export default function SettingsPage() {
       const res = await fetch('/api/meta/status');
       const data = await res.json();
       setStatus(data);
+
+      if (data.integrationMode) {
+        setIntegrationModeTab(data.integrationMode);
+      }
+      if (data.appId) setManualAppId(data.appId);
+      if (data.pageId) setManualPageId(data.pageId);
+      if (data.pageName) setManualPageName(data.pageName);
+      if (data.adAccountId) setManualAdAccountId(data.adAccountId);
+      if (data.verifyToken) setManualVerifyToken(data.verifyToken);
+      if (data.webhookUrl) setManualWebhookUrl(data.webhookUrl);
+
       if (data.metaCapiConfig) setCapiConfig(data.metaCapiConfig);
       if (data.metaCapiLogs) setCapiEvents(data.metaCapiLogs);
     } catch (e) {
@@ -137,9 +316,13 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 20000);
+    fetchNeoConfig();
+    const interval = setInterval(() => {
+      fetchStatus();
+      fetchNeoConfig();
+    }, 20000);
     return () => clearInterval(interval);
-  }, [fetchStatus]);
+  }, [fetchStatus, fetchNeoConfig]);
 
   useEffect(() => {
     if (activeTab === 'DIAGNOSTICS' && !tokenHealth) {
@@ -153,7 +336,7 @@ export default function SettingsPage() {
     if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       redirectUri = 'https://caller-website-monitoring.vercel.app/api/meta/oauth/callback';
     }
-    const appId = status?.appId || '1007200718473332';
+    const appId = status?.appId || manualAppId || '1007200718473332';
     const configId = status?.configId || '2583186895497299';
 
     // Facebook Login for Business strictly requires config_id, response_type=code, and auth_type=rerequest
@@ -186,6 +369,132 @@ export default function SettingsPage() {
     window.addEventListener('message', onMessage);
   };
 
+  // Test Manual Connection against Graph API
+  const handleTestManualConnection = async () => {
+    if (!manualToken || manualToken.trim().length < 15) {
+      showToast('Please enter a valid Meta Access Token (starts with EAA...)');
+      return;
+    }
+    setTestingManual(true);
+    setManualTestResult(null);
+
+    try {
+      const res = await fetch('/api/meta/manual-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TEST_CONNECTION',
+          accessToken: manualToken.trim(),
+          appId: manualAppId.trim(),
+          pageId: manualPageId.trim()
+        })
+      });
+      const data = await res.json();
+      setManualTestResult(data);
+      if (data.success) {
+        showToast(`Token Verified: Connected to "${data.pageName}" with ${data.formsCount} forms!`);
+        if (data.pageId) setManualPageId(data.pageId);
+        if (data.pageName) setManualPageName(data.pageName);
+      } else {
+        showToast(`Validation Failed: ${data.error || 'Invalid Meta Token'}`);
+      }
+    } catch (err) {
+      showToast('Connection test failed: ' + err.message);
+    } finally {
+      setTestingManual(false);
+    }
+  };
+
+  // Save and Activate Manual Setup
+  const handleSaveManualConfig = async (e) => {
+    if (e) e.preventDefault();
+    if (!manualToken && !status?.hasToken) {
+      showToast('Please provide a valid Meta Access Token.');
+      return;
+    }
+    setSavingManual(true);
+
+    try {
+      const res = await fetch('/api/meta/manual-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SAVE_MANUAL_CONFIG',
+          accessToken: manualToken.trim(),
+          appId: manualAppId.trim(),
+          appSecret: manualAppSecret.trim(),
+          pageId: manualPageId.trim(),
+          pageName: manualPageName.trim(),
+          adAccountId: manualAdAccountId.trim(),
+          verifyToken: manualVerifyToken.trim(),
+          webhookUrl: manualWebhookUrl.trim(),
+          primaryFormId: manualFormId.trim()
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'Manual Setup Activated Successfully!');
+        fetchStatus();
+      } else {
+        showToast(data.error || 'Failed to save manual setup.');
+      }
+    } catch (err) {
+      showToast('Failed to save: ' + err.message);
+    } finally {
+      setSavingManual(false);
+    }
+  };
+
+  // Send Test Lead through Real Webhook Ingestion Engine
+  const openTestLeadModal = () => {
+    if (!testLeadFormId && status?.metaForms?.[0]?.formId) {
+      setTestLeadFormId(status.metaForms[0].formId);
+    }
+    setTestLeadPhone('98' + Math.floor(10000000 + Math.random() * 90000000));
+    setTestLeadResult(null);
+    setTestLeadModalOpen(true);
+  };
+
+  const handleSendTestLead = async (e) => {
+    if (e) e.preventDefault();
+    setSendingTestLead(true);
+    setTestLeadResult(null);
+
+    const activeFormId = testLeadFormId || status?.metaForms?.[0]?.formId || '1768141694308234';
+    const activeForm = (status?.metaForms || []).find(f => String(f.formId) === String(activeFormId));
+
+    try {
+      const res = await fetch('/api/meta/manual-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SEND_TEST_LEAD',
+          formId: activeFormId,
+          formName: activeForm?.formName || 'Mirzapur 1 =9/2026, 16:00',
+          prospectName: testLeadName,
+          mobileNumber: testLeadPhone,
+          emailAddress: testLeadEmail,
+          cityName: testLeadCity,
+          stateName: testLeadState,
+          businessType: testLeadBusiness,
+          productInterest: testLeadProduct
+        })
+      });
+      const data = await res.json();
+      setTestLeadResult(data);
+      if (data.success) {
+        showToast(`Meta Lead Ingested & Verified! Lead ID: ${data.lead.lead_id} assigned to ${data.lead.assignedTo}.`);
+        fetchStatus();
+      } else {
+        showToast(data.error || 'Test lead simulation failed.');
+      }
+    } catch (err) {
+      showToast('Error sending test lead: ' + err.message);
+    } finally {
+      setSendingTestLead(false);
+    }
+  };
+
   // Full Meta Sync
   const handleFullMetaSync = async () => {
     setSyncingAll(true);
@@ -206,36 +515,6 @@ export default function SettingsPage() {
       showToast('Error syncing forms.');
     } finally {
       setSyncingAll(false);
-    }
-  };
-
-  // Direct Token Connect (System User or Page Access Token - Bypasses Facebook Dialog)
-  const handleSaveCustomToken = async (e) => {
-    e.preventDefault();
-    if (!customToken || customToken.trim().length < 15) {
-      showToast('Please enter a valid Meta Page Access Token (starts with EAA...)');
-      return;
-    }
-    setSavingFb(true);
-    try {
-      const res = await fetch('/api/meta/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: customToken.trim() })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(`Meta connected successfully! ${data.message || ''}`);
-        setShowTokenInput(false);
-        setCustomToken('');
-        fetchStatus();
-      } else {
-        showToast(data.error || 'Failed to connect token');
-      }
-    } catch (err) {
-      showToast(err.message || 'Connection failed');
-    } finally {
-      setSavingFb(false);
     }
   };
 
@@ -353,22 +632,24 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'UPDATE_CONFIG',
-          ...capiConfig
+          config: capiConfig
         })
       });
       const data = await res.json();
       if (data.success) {
-        showToast('Meta Conversions API (CAPI) settings updated!');
+        showToast('Conversions API (CAPI) configuration saved!');
         fetchStatus();
+      } else {
+        showToast(data.error || 'Failed to update CAPI config.');
       }
-    } catch (err) {
-      showToast('Failed to save CAPI settings.');
+    } catch (e) {
+      showToast('Error saving CAPI.');
     } finally {
       setSavingCapi(false);
     }
   };
 
-  // Test-Fire CAPI Event
+  // Test Fire CAPI Event
   const handleTestCapiEvent = async (eventName = 'QualifiedLead') => {
     setTestingCapi(true);
     setCapiTestResult(null);
@@ -377,22 +658,26 @@ export default function SettingsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'TEST_EVENT',
+          action: 'TEST_FIRE',
           eventName,
-          value: eventName === 'Purchase' ? 10000 : 2500,
-          testName: 'Enterprise Client',
-          testMobile: '9905234866',
-          testEmail: 'operations@kisanindia.com'
+          leadName: 'Vikramaditya Verma (Test)',
+          phone: '9876543299',
+          email: 'lead@kisanchoice.com',
+          city: 'Indore',
+          state: 'Madhya Pradesh',
+          value: eventName === 'Purchase' ? 25000 : 500
         })
       });
       const data = await res.json();
       setCapiTestResult(data);
       if (data.success) {
-        showToast(`CAPI Event "${eventName}" dispatched successfully!`);
+        showToast(`CAPI ${eventName} dispatched! Events received: ${data.events_received || 1}`);
         fetchStatus();
+      } else {
+        showToast(`CAPI warning: ${data.error || 'Failed to dispatch'}`);
       }
-    } catch (err) {
-      showToast('CAPI test failed.');
+    } catch (e) {
+      showToast('Failed to fire CAPI event.');
     } finally {
       setTestingCapi(false);
     }
@@ -415,16 +700,16 @@ export default function SettingsPage() {
               field: 'leadgen',
               value: {
                 ad_id: '12021590483920042',
-                form_id: simFormId || status?.metaForms?.[0]?.formId || '1768141694388234',
+                form_id: simFormId || status?.metaForms?.[0]?.formId || '1768141694308234',
                 leadgen_id: `SIM-${Date.now()}`,
                 created_time: Math.floor(Date.now() / 1000),
                 campaign_name: 'Sales - Mirzapur 1 -9/2026, 16:00',
                 field_data: [
-                  { name: 'full_name', values: [simName] },
-                  { name: 'phone_number', values: [simMobile] },
+                  { name: 'full_name', values: [simName || 'Vikramaditya Verma'] },
+                  { name: 'phone_number', values: [simMobile || '9876543299'] },
                   { name: 'email', values: ['lead@kisanchoice.com'] },
-                  { name: 'city', values: ['Indore'] },
-                  { name: 'product_interest', values: [simProduct] }
+                  { name: 'city', values: ['Varanasi'] },
+                  { name: 'product_interest', values: [simProduct || 'Mustard Oil (15L Tin)'] }
                 ]
               }
             }
@@ -442,7 +727,7 @@ export default function SettingsPage() {
       const data = await res.json();
       setSimResult(data);
       if (data.success) {
-        showToast(`Webhook Ingestion Simulated: Lead ${data.lead_id} assigned to ${data.assignedTo}!`);
+        showToast(`Webhook Ingestion Simulated: Lead ${data.lead?.lead_id || data.lead_id} assigned to ${data.lead?.assignedTo || data.assignedTo}!`);
         fetchStatus();
       } else {
         showToast(data.error || 'Simulation returned non-success');
@@ -481,7 +766,7 @@ export default function SettingsPage() {
     <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
       <Header
         title="Meta Lead Ads Enterprise Integration Suite"
-        subtitle="Graph v21.0 sync, Conversions API (CAPI), AI anti-spam scoring, live webhook simulator & zero-loss telemetry"
+        subtitle="Dual Integration (OAuth 2.0 & Manual Token/Webhook), CAPI, Anti-Spam scoring & zero-loss telemetry"
       />
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full max-w-none">
@@ -509,89 +794,74 @@ export default function SettingsPage() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h2 className="text-xl font-heading font-extrabold text-slate-900">
-                    {status?.pageName || 'Kisan Choice'}
+                    {status?.pageName || manualPageName || 'Kisan Choice'}
                   </h2>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     Meta Graph v21.0 Active
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    Page ID: {status?.pageId || '933429549844450'}
+                    Mode: {status?.integrationMode === 'MANUAL' ? 'Manual Setup' : 'OAuth 2.0'}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                    Page ID: {status?.pageId || manualPageId || '933429549844450'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 font-medium">
-                  Ad Account: <strong className="text-slate-700">{status?.adAccountId || 'act_1796071777698019'} (Kisan Kumar)</strong> • Meta App: <strong className="text-slate-700">kisanGroups ({status?.appId || '1007200718473332'})</strong>
+                  Ad Account: <strong className="text-slate-700">{status?.adAccountId || manualAdAccountId} (Kisan Kumar)</strong> • App ID: <strong className="text-slate-700">{status?.appId || manualAppId}</strong>
                 </p>
               </div>
             </div>
 
-            {/* Quick Actions */}
+            {/* Quick Actions Bar */}
             <div className="flex items-center gap-2.5 flex-wrap">
               <button
-                onClick={handleLaunchMetaOAuth}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                onClick={() => {
+                  setActiveTab('INTEGRATION');
+                  setIntegrationModeTab('OAUTH');
+                }}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
+                  integrationModeTab === 'OAUTH' && activeTab === 'INTEGRATION'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                }`}
               >
                 <Facebook size={15} />
-                <span>Launch Meta OAuth 2.0</span>
+                <span>OAuth 2.0 Flow</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('INTEGRATION');
+                  setIntegrationModeTab('MANUAL');
+                }}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
+                  integrationModeTab === 'MANUAL' && activeTab === 'INTEGRATION'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <KeyRound size={15} />
+                <span>Manual Setup</span>
+              </button>
+
+              <button
+                onClick={openTestLeadModal}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+              >
+                <Zap size={14} className="text-amber-300" />
+                <span>Send Test Lead</span>
               </button>
 
               <button
                 onClick={handleFullMetaSync}
                 disabled={syncingAll}
-                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {syncingAll ? <Loader2 size={15} className="animate-spin text-white" /> : <RefreshCw size={15} />}
-                <span>Sync All Forms &amp; Leads</span>
-              </button>
-
-              <button
-                onClick={() => setShowTokenInput(!showTokenInput)}
-                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <KeyRound size={14} className="text-slate-500" />
-                <span>Paste Token Directly</span>
+                <span>Sync Forms</span>
               </button>
             </div>
-
-            {/* Direct Token Input Drawer (Bypasses Facebook Login Popup) */}
-            {showTokenInput && (
-              <form onSubmit={handleSaveCustomToken} className="mt-4 p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-3 animate-in fade-in slide-in-from-top-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <KeyRound size={16} className="text-blue-600" />
-                    <span className="text-xs font-bold text-slate-900">Direct Meta Page Access Token (Never Expires)</span>
-                  </div>
-                  <span className="text-[11px] text-blue-700 font-medium">Bypasses Facebook OAuth Dialog</span>
-                </div>
-                <p className="text-[11px] text-slate-600">
-                  Generate from <strong>Meta Business Suite &gt; System Users</strong> or <strong>Graph API Explorer</strong> with <code>leads_retrieval</code> and <code>pages_manage_ads</code> scopes.
-                </p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="password"
-                    value={customToken}
-                    onChange={(e) => setCustomToken(e.target.value)}
-                    placeholder="EAABw..."
-                    className="flex-1 px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                  <button
-                    type="submit"
-                    disabled={savingFb}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
-                  >
-                    {savingFb ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                    <span>{savingFb ? 'Validating...' : 'Connect Token'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowTokenInput(false)}
-                    className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
           </div>
 
           {/* KPI Cards */}
@@ -617,18 +887,20 @@ export default function SettingsPage() {
             <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-200/70">
               <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider block">Active Lead Forms</span>
               <span className="text-2xl font-bold font-heading text-indigo-800 tabular-nums">{metaForms.length}</span>
-              <p className="text-[11px] text-indigo-600 mt-0.5">Page: {status?.pageName || 'Connected Page'}</p>
+              <p className="text-[11px] text-indigo-600 mt-0.5">Page: {status?.pageName || manualPageName}</p>
             </div>
           </div>
         </div>
 
-        {/* 5 Enterprise Navigation Tabs */}
+        {/* 7 Enterprise Navigation Tabs */}
         <div className="flex items-center gap-1.5 p-1.5 bg-slate-200/60 rounded-2xl overflow-x-auto">
           {[
+            { id: 'INTEGRATION', label: 'Dual Integration Hub (OAuth / Manual)', icon: Link2 },
             { id: 'FORMS', label: `Real Meta Lead Forms (${metaForms.length})`, icon: FileSpreadsheet },
+            { id: 'NEODOVE', label: 'NeoDove CRM & Multi-Webhook Hub', icon: Share2 },
+            { id: 'WEBHOOK', label: 'Webhook & Live Simulator', icon: Radio },
             { id: 'CAPI', label: 'Conversions API (CAPI)', icon: Zap },
             { id: 'QUALITY', label: 'AI Lead Quality & Anti-Spam', icon: Sparkles },
-            { id: 'WEBHOOK', label: 'Webhook & Live Simulator', icon: Radio },
             { id: 'DIAGNOSTICS', label: 'Token & Scopes Health', icon: Cpu }
           ].map((tab) => {
             const Icon = tab.icon;
@@ -649,6 +921,400 @@ export default function SettingsPage() {
             );
           })}
         </div>
+
+        {/* TAB 0: Dual Integration Hub */}
+        {activeTab === 'INTEGRATION' && (
+          <div className="space-y-6">
+            {/* Sub-Switch for OAuth vs Manual */}
+            <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-xs flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIntegrationModeTab('OAUTH')}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                    integrationModeTab === 'OAUTH'
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <Facebook size={16} />
+                  <span>Method 1: Facebook OAuth 2.0 (Automated)</span>
+                </button>
+
+                <button
+                  onClick={() => setIntegrationModeTab('MANUAL')}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                    integrationModeTab === 'MANUAL'
+                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <KeyRound size={16} />
+                  <span>Method 2: Manual Setup (Token &amp; Webhook)</span>
+                </button>
+              </div>
+
+              <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <ShieldCheck size={16} className="text-emerald-600" />
+                <span>Both methods support Zero-Loss Ingestion &amp; Live Round-Robin</span>
+              </div>
+            </div>
+
+            {/* METHOD 1: OAUTH 2.0 FLOW */}
+            {integrationModeTab === 'OAUTH' && (
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 lg:p-8 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+                      <Facebook size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-heading font-bold text-slate-900">
+                        Method 1: Official Facebook OAuth 2.0 Handshake
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 max-w-xl">
+                        1-Click connection using Facebook Login for Business dialog. Exchanges code for a 60-day auto-renewing Page Access Token and subscribes to real-time Lead Ads notifications.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleLaunchMetaOAuth}
+                      className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-bold shadow-md shadow-blue-600/25 flex items-center gap-2 cursor-pointer transition-all active:scale-98"
+                    >
+                      <Facebook size={16} />
+                      <span>Connect with Facebook (OAuth Dialog)</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Target Facebook Page</span>
+                    <span className="text-base font-bold text-slate-900 block">{status?.pageName || 'Kisan Choice'}</span>
+                    <span className="text-xs text-slate-500 font-mono">Page ID: {status?.pageId || '933429549844450'}</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Facebook App ID &amp; Config</span>
+                    <span className="text-base font-bold text-slate-900 block font-mono">{status?.appId || '1007200718473332'}</span>
+                    <span className="text-xs text-slate-500">Config ID: 2583186895497299</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">OAuth Handshake Scopes</span>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {['leads_retrieval', 'pages_manage_ads', 'pages_show_list', 'pages_read_engagement'].map(sc => (
+                        <span key={sc} className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-mono text-[10px] font-bold">
+                          {sc}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 text-blue-950 text-xs space-y-2">
+                  <div className="font-bold flex items-center gap-2 text-blue-900">
+                    <ShieldCheck size={16} className="text-blue-600" />
+                    <span>How OAuth Flow Works</span>
+                  </div>
+                  <p className="text-blue-800 leading-relaxed text-[11px]">
+                    Clicking <strong>Connect with Facebook</strong> opens the official Meta authorization window. Upon approval, Facebook redirects to <code>/api/meta/oauth/callback</code>, securely fetches your permanent Page Access Token, discovers all connected Kisan Choice leadgen forms, and automatically subscribes your page to real-time webhook callbacks.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* METHOD 2: MANUAL SETUP FLOW */}
+            {integrationModeTab === 'MANUAL' && (
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 lg:p-8 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+                      <KeyRound size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-heading font-bold text-slate-900">
+                        Method 2: Manual Meta Token &amp; Webhook Configuration
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 max-w-xl">
+                        Directly enter your Meta System User / Page Access Token, App Secret, and configure Webhook Callback URL and Verify Token for permanent, non-expiring lead ingestion.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleTestManualConnection}
+                      disabled={testingManual}
+                      className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {testingManual ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />}
+                      <span>Test Connection</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveManualConfig}
+                      disabled={savingManual}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {savingManual ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                      <span>Save &amp; Activate Setup</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Manual Credentials Form */}
+                <form onSubmit={handleSaveManualConfig} className="space-y-5">
+                  {/* Token Row */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <KeyRound size={14} className="text-emerald-600" />
+                        <span>Meta Access Token (Page Access Token or System User Token)</span>
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <span className="text-[11px] text-slate-400 font-mono">Starts with EAA...</span>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type={showManualToken ? 'text' : 'password'}
+                        value={manualToken}
+                        onChange={(e) => setManualToken(e.target.value)}
+                        placeholder="Paste Meta Page Access Token (EAABw...)"
+                        className="w-full pl-3.5 pr-20 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowManualToken(!showManualToken)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showManualToken ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Generated from <strong>Meta Business Suite &gt; Settings &gt; System Users</strong> with <code>leads_retrieval</code> and <code>pages_manage_ads</code> scopes.
+                    </p>
+                  </div>
+
+                  {/* App ID & Secret */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 block mb-1">
+                        Meta App ID <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={manualAppId}
+                        onChange={(e) => setManualAppId(e.target.value)}
+                        placeholder="1007200718473332"
+                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 block mb-1">
+                        Meta App Secret (for Webhook Signature Verification)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showManualSecret ? 'text' : 'password'}
+                          value={manualAppSecret}
+                          onChange={(e) => setManualAppSecret(e.target.value)}
+                          placeholder="App Secret from Basic Settings"
+                          className="w-full pl-3.5 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowManualSecret(!showManualSecret)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showManualSecret ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Page ID, Page Name, Ad Account ID */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 block mb-1">
+                        Facebook Page ID <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={manualPageId}
+                        onChange={(e) => setManualPageId(e.target.value)}
+                        placeholder="933429549844450"
+                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 block mb-1">
+                        Page Name
+                      </label>
+                      <input
+                        type="text"
+                        value={manualPageName}
+                        onChange={(e) => setManualPageName(e.target.value)}
+                        placeholder="Kisan Choice"
+                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 block mb-1">
+                        Ad Account ID
+                      </label>
+                      <input
+                        type="text"
+                        value={manualAdAccountId}
+                        onChange={(e) => setManualAdAccountId(e.target.value)}
+                        placeholder="act_1796071777698019"
+                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Webhook Configuration Details */}
+                  <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Radio size={16} className="text-blue-600" />
+                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Meta Webhook Subscription Credentials
+                        </h4>
+                      </div>
+                      <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        Zero-Loss Receiver Active
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600 block mb-1">
+                          Callback URL (Paste in Meta Developer Console)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            readOnly
+                            value={manualWebhookUrl || `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/meta`}
+                            className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl font-mono text-slate-700 select-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(manualWebhookUrl || `${window.location.origin}/api/webhooks/meta`);
+                              showToast('Webhook Callback URL copied!');
+                            }}
+                            className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                          >
+                            <Copy size={13} />
+                            <span>Copy</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600 block mb-1">
+                          Verify Token (Paste in Meta Developer Console)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={manualVerifyToken}
+                            onChange={(e) => setManualVerifyToken(e.target.value)}
+                            className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl font-mono text-slate-700"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(manualVerifyToken);
+                              showToast('Verify Token copied!');
+                            }}
+                            className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                          >
+                            <Copy size={13} />
+                            <span>Copy</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Test Connection Result Card */}
+                  {manualTestResult && (
+                    <div className={`p-4 rounded-2xl border text-xs space-y-2 animate-in fade-in ${
+                      manualTestResult.success ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-red-50 border-red-200 text-red-950'
+                    }`}>
+                      <div className="font-bold flex items-center gap-2">
+                        {manualTestResult.success ? (
+                          <>
+                            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                            <span>Connection Diagnostic Passed!</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle size={16} className="text-red-600 shrink-0" />
+                            <span>Connection Diagnostic Failed</span>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-[11px]">{manualTestResult.message || manualTestResult.error}</p>
+                      {manualTestResult.tokenDebug && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
+                          <div>Expires: <strong className="text-slate-900">{manualTestResult.tokenDebug.expiresAt}</strong></div>
+                          <div>Token Type: <strong className="text-slate-900">{manualTestResult.tokenDebug.type}</strong></div>
+                          <div>Forms Discovered: <strong className="text-blue-700">{manualTestResult.formsCount || 0}</strong></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Buttons Row */}
+                  <div className="flex items-center justify-between pt-2 flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={openTestLeadModal}
+                      className="px-4 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold flex items-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Zap size={14} className="text-purple-600" />
+                      <span>Send Test Lead Webhook</span>
+                    </button>
+
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={handleTestManualConnection}
+                        disabled={testingManual}
+                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {testingManual ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />}
+                        <span>Test Connection</span>
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={savingManual}
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {savingManual ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                        <span>Save &amp; Activate Manual Setup</span>
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* TAB 1: Real Meta Lead Forms */}
         {activeTab === 'FORMS' && (
@@ -698,56 +1364,64 @@ export default function SettingsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredForms.map((form) => (
-                      <tr key={form.formId} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-4 px-6">
-                          <div className="font-bold text-slate-900 text-sm">{form.formName}</div>
-                          <div className="text-[11px] font-mono text-slate-400 mt-0.5">ID: {form.formId}</div>
-                        </td>
-                        <td className="py-4 px-4 text-slate-700 font-medium">
-                          {form.campaignName || form.formName}
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-semibold text-[11px]">
-                            {form.distributionRule === 'DIRECT_CALLER' ? 'Direct Caller' : 'Auto Round-Robin'}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4 text-slate-700 font-semibold">
-                          {form.assignedTeam || 'North Region Sales'}
-                        </td>
-                        <td className="py-4 px-4">
-                          <button
-                            onClick={() => handleToggleForm(form.formId)}
-                            className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer ${
-                              form.active !== false
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            {form.active !== false ? 'Active' : 'Paused'}
-                          </button>
-                        </td>
-                        <td className="py-4 px-4 text-center font-bold text-slate-900 tabular-nums">
-                          {form.leadsCaptured || 0}
-                        </td>
-                        <td className="py-4 px-6 text-right space-x-2 whitespace-nowrap">
-                          <button
-                            onClick={() => handleSyncSingleForm(form.formId, form.formName)}
-                            disabled={syncingFormId === form.formId}
-                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-[11px] shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
-                          >
-                            {syncingFormId === form.formId ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                            <span>Sync Leads</span>
-                          </button>
-                          <button
-                            onClick={() => handleOpenFieldMapping(form)}
-                            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] cursor-pointer"
-                          >
-                            Fields
-                          </button>
+                    {filteredForms.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400">
+                          No Meta lead forms matching your filter.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredForms.map((f) => (
+                        <tr key={f.formId} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3.5 px-6 font-semibold text-slate-900">
+                            <div>{f.formName}</div>
+                            <div className="text-[10px] font-mono text-slate-400">ID: {f.formId}</div>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600">{f.campaignName || 'Meta Ads'}</td>
+                          <td className="py-3.5 px-4">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700">
+                              {f.distributionRule || 'ROUND_ROBIN'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600">{f.assignedTeam || 'North Region Sales'}</td>
+                          <td className="py-3.5 px-4">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              f.active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${f.active !== false ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                              <span>{f.active !== false ? 'Active' : 'Paused'}</span>
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-bold text-slate-900 tabular-nums">
+                            {f.leadsCaptured || 0}
+                          </td>
+                          <td className="py-3.5 px-6 text-right space-x-1.5">
+                            <button
+                              onClick={() => handleSyncSingleForm(f.formId, f.formName)}
+                              disabled={syncingFormId === f.formId}
+                              title="Sync leads from this form"
+                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 cursor-pointer disabled:opacity-50"
+                            >
+                              <RefreshCw size={13} className={syncingFormId === f.formId ? 'animate-spin' : ''} />
+                            </button>
+                            <button
+                              onClick={() => handleOpenFieldMapping(f)}
+                              title="Configure Field Mapping"
+                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 cursor-pointer"
+                            >
+                              <SlidersHorizontal size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleToggleForm(f.formId)}
+                              title={f.active !== false ? 'Pause Form' : 'Activate Form'}
+                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 cursor-pointer"
+                            >
+                              <Activity size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -755,249 +1429,9 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* TAB 2: Meta Conversions API (CAPI) */}
-        {activeTab === 'CAPI' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column: CAPI Configuration & Test Dispatcher */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-md">
-                    <Zap size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-heading font-bold text-slate-900">
-                      Server-Side Conversions API (CAPI) Setup
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Dispatches offline lead qualification events to Meta for ad optimization
-                    </p>
-                  </div>
-                </div>
-
-                <form onSubmit={handleSaveCapiConfig} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Meta Pixel / Dataset ID
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 1007200718473332 or 123456789012345"
-                      value={capiConfig.pixelId || ''}
-                      onChange={(e) => setCapiConfig({ ...capiConfig, pixelId: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Meta Events Manager Test Event Code (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. TEST12345 (Found in Meta Events Manager > Test Events tab)"
-                      value={capiConfig.testEventCode || ''}
-                      onChange={(e) => setCapiConfig({ ...capiConfig, testEventCode: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                    />
-                  </div>
-
-                  <div className="space-y-2 pt-1">
-                    <label className="flex items-center gap-2.5 text-xs font-medium text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={capiConfig.autoSendOnInterested}
-                        onChange={(e) => setCapiConfig({ ...capiConfig, autoSendOnInterested: e.target.checked })}
-                        className="w-4 h-4 rounded text-blue-600 accent-blue-600"
-                      />
-                      <span>Auto-send <strong className="text-indigo-600">QualifiedLead</strong> event when telecaller marks prospect as Interested</span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 text-xs font-medium text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={capiConfig.autoSendOnClosed}
-                        onChange={(e) => setCapiConfig({ ...capiConfig, autoSendOnClosed: e.target.checked })}
-                        className="w-4 h-4 rounded text-blue-600 accent-blue-600"
-                      />
-                      <span>Auto-send <strong className="text-emerald-600">Purchase</strong> event (₹10,000 value) when deal is marked Closed / Won</span>
-                    </label>
-                  </div>
-
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={savingCapi}
-                      className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                    >
-                      {savingCapi ? 'Saving CAPI...' : 'Save CAPI Configuration'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Live Test Event Dispatcher */}
-              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-heading font-bold text-slate-900 flex items-center gap-2">
-                    <Send size={16} className="text-blue-600" />
-                    <span>Test-Fire Live CAPI Event</span>
-                  </h4>
-                  <span className="text-[11px] font-semibold text-slate-400">Meta Graph API v21.0</span>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Test Meta server-side event transmission with SHA-256 hashed phone, email, and city parameters according to Meta specification.
-                </p>
-
-                <div className="flex items-center gap-3 pt-2">
-                  <button
-                    onClick={() => handleTestCapiEvent('QualifiedLead')}
-                    disabled={testingCapi}
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {testingCapi ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                    <span>Test "QualifiedLead" (₹2,500)</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleTestCapiEvent('Purchase')}
-                    disabled={testingCapi}
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {testingCapi ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    <span>Test "Purchase" (₹10,000)</span>
-                  </button>
-                </div>
-
-                {capiTestResult && (
-                  <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-slate-800 text-xs space-y-2.5 mt-3 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 font-bold text-emerald-800">
-                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                        <span>Conversion Event Dispatched Successfully</span>
-                      </div>
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-semibold text-[11px]">
-                        {capiTestResult.latencyMs}ms
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                      <div>
-                        <span className="text-slate-500 block text-[11px]">Event Type:</span>
-                        <strong className="text-slate-900">{capiTestResult.logItem?.eventName || 'QualifiedLead'}</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block text-[11px]">Attributed Value:</span>
-                        <strong className="text-emerald-700 font-bold">₹{capiTestResult.logItem?.value || 2500}</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block text-[11px]">Target Prospect:</span>
-                        <strong className="text-slate-900">{capiTestResult.logItem?.leadName || 'Distributor Lead'}</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block text-[11px]">Meta Status:</span>
-                        <strong className="text-blue-700 font-semibold">{capiTestResult.status}</strong>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right Column: Sent Events Audit Table */}
-            <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4 flex flex-col h-[600px]">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <h4 className="text-sm font-heading font-bold text-slate-900">
-                  Recent CAPI Dispatches
-                </h4>
-                <span className="text-xs font-bold text-blue-600">{capiEvents.length} Logged</span>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-3">
-                {capiEvents.length === 0 ? (
-                  <div className="text-center py-16 text-slate-400 text-xs">
-                    No CAPI events dispatched yet. Use the buttons on the left to fire your first event.
-                  </div>
-                ) : (
-                  capiEvents.map((evt) => (
-                    <div key={evt.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900">{evt.eventName}</span>
-                        <span className="text-[11px] font-semibold text-emerald-600">₹{evt.value}</span>
-                      </div>
-                      <div className="text-slate-500 text-[11px]">
-                        Lead: <strong className="text-slate-700">{evt.leadName || evt.leadId}</strong>
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-                        <span className="font-semibold text-blue-600">{evt.status}</span>
-                        <span>{new Date(evt.timestamp).toLocaleTimeString('en-IN')}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: AI Lead Quality & Anti-Spam */}
-        {activeTab === 'QUALITY' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 lg:p-7 space-y-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                  <Sparkles size={22} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-heading font-bold text-slate-900">
-                    AI Lead Intent &amp; Anti-Spam Verification Engine
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
-                    Evaluates every incoming Facebook &amp; Instagram submission against 4 heuristic layers to filter fake numbers, test inquiries, and score buyer commercial intent before telecaller routing.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                  <span className="text-xs font-bold text-slate-700 block">Layer 1: Mobile Integrity</span>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Validates 10-digit Indian mobile prefixes (6, 7, 8, 9) and traps repeated patterns (e.g. 9999999999).
-                  </p>
-                  <span className="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">+35 Score</span>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                  <span className="text-xs font-bold text-slate-700 block">Layer 2: Fake Name Trap</span>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Filters out test inputs ("asdf", "test", "demo", "xyz") and ensures minimum 2 alphabetic characters.
-                  </p>
-                  <span className="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">+25 Score</span>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                  <span className="text-xs font-bold text-slate-700 block">Layer 3: Email Validity</span>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    RFC 5322 syntax validation; boosts genuine business and domain email providers.
-                  </p>
-                  <span className="inline-block px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">+20 Score</span>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                  <span className="text-xs font-bold text-slate-700 block">Layer 4: Commercial Intent</span>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Checks explicit business type (Distributor/Trader) &amp; volume requirement selections.
-                  </p>
-                  <span className="inline-block px-2 py-0.5 rounded bg-purple-50 text-purple-700 text-[10px] font-bold">+20 Score</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: Webhook & Live Simulator */}
+        {/* TAB 2: Webhook & Live Simulator */}
         {activeTab === 'WEBHOOK' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left: Webhook URL & Simulator Form */}
             <div className="lg:col-span-7 space-y-6">
               {/* Webhook Credentials Box */}
               <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4">
@@ -1073,7 +1507,7 @@ export default function SettingsPage() {
                         type="text"
                         value={simName}
                         onChange={(e) => setSimName(e.target.value)}
-                        placeholder="Enter prospect name"
+                        placeholder="Vikramaditya Verma"
                         className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold"
                         required
                       />
@@ -1084,7 +1518,7 @@ export default function SettingsPage() {
                         type="tel"
                         value={simMobile}
                         onChange={(e) => setSimMobile(e.target.value)}
-                        placeholder="10-digit mobile number"
+                        placeholder="9876543299"
                         className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold"
                         required
                       />
@@ -1097,7 +1531,7 @@ export default function SettingsPage() {
                       type="text"
                       value={simProduct}
                       onChange={(e) => setSimProduct(e.target.value)}
-                      placeholder="Enter product inquiry / requirement"
+                      placeholder="Mustard Oil (15L Tin)"
                       className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold"
                       required
                     />
@@ -1122,10 +1556,10 @@ export default function SettingsPage() {
                       <span>Ingestion Successful ({simResult.latencyMs}ms)</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
-                      <div>Lead ID: <strong className="text-slate-900">{simResult.lead_id}</strong></div>
-                      <div>Assigned Telecaller: <strong className="text-blue-700">{simResult.assignedTo}</strong></div>
-                      <div>Quality Score: <strong className="text-emerald-700">{simResult.qualityScore}/100</strong></div>
-                      <div>Intent Tier: <strong className="text-purple-700">{simResult.qualityTier}</strong></div>
+                      <div>Lead ID: <strong className="text-slate-900">{simResult.lead?.lead_id || simResult.lead_id}</strong></div>
+                      <div>Assigned Telecaller: <strong className="text-blue-700">{simResult.lead?.assignedTo || simResult.assignedTo}</strong></div>
+                      <div>Quality Score: <strong className="text-emerald-700">{simResult.lead?.qualityScore || simResult.qualityScore}/100</strong></div>
+                      <div>Intent Tier: <strong className="text-purple-700">{simResult.lead?.qualityTier || simResult.qualityTier}</strong></div>
                     </div>
                   </div>
                 )}
@@ -1166,6 +1600,159 @@ export default function SettingsPage() {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: Conversions API (CAPI) */}
+        {activeTab === 'CAPI' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 lg:p-7 space-y-6">
+              <div className="flex items-start gap-4 pb-4 border-b border-slate-100">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Zap size={22} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-heading font-bold text-slate-900">
+                    Meta Conversions API (CAPI) Engine
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xl">
+                    Sends server-side qualification events back to Meta Ads to train delivery algorithms on high-value distributor leads.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveCapiConfig} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Meta Pixel / Dataset ID</label>
+                    <input
+                      type="text"
+                      value={capiConfig.pixelId}
+                      onChange={(e) => setCapiConfig({ ...capiConfig, pixelId: e.target.value })}
+                      placeholder="e.g. 109283746592837"
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Test Event Code (Meta Events Manager)</label>
+                    <input
+                      type="text"
+                      value={capiConfig.testEventCode}
+                      onChange={(e) => setCapiConfig({ ...capiConfig, testEventCode: e.target.value })}
+                      placeholder="e.g. TEST12345"
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleTestCapiEvent('QualifiedLead')}
+                      disabled={testingCapi}
+                      className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {testingCapi ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />}
+                      <span>Test Fire QualifiedLead</span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={savingCapi}
+                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {savingCapi ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                    <span>Save CAPI Settings</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4 flex flex-col h-[500px]">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h4 className="text-sm font-heading font-bold text-slate-900">Recent CAPI Dispatches</h4>
+                <span className="text-xs font-bold text-blue-600">{capiEvents.length} Logged</span>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-3">
+                {capiEvents.length === 0 ? (
+                  <div className="text-center py-16 text-slate-400 text-xs">
+                    No CAPI events dispatched yet.
+                  </div>
+                ) : (
+                  capiEvents.map((evt) => (
+                    <div key={evt.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900">{evt.eventName}</span>
+                        <span className="text-[11px] font-semibold text-emerald-600">₹{evt.value}</span>
+                      </div>
+                      <div className="text-slate-500 text-[11px]">Lead: <strong className="text-slate-700">{evt.leadName}</strong></div>
+                      <div className="text-[10px] text-slate-400 flex justify-between pt-1">
+                        <span className="font-semibold text-blue-600">{evt.status}</span>
+                        <span>{new Date(evt.timestamp).toLocaleTimeString('en-IN')}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: AI Lead Quality & Anti-Spam */}
+        {activeTab === 'QUALITY' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 lg:p-7 space-y-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Sparkles size={22} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-heading font-bold text-slate-900">
+                    AI Lead Intent &amp; Anti-Spam Verification Engine
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                    Evaluates incoming Facebook &amp; Instagram submissions against 4 heuristic layers to score buyer commercial intent before telecaller routing.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <span className="text-xs font-bold text-slate-700 block">Layer 1: Mobile Integrity</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Validates 10-digit Indian mobile prefixes (6, 7, 8, 9) and traps repeated patterns.
+                  </p>
+                  <span className="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">+35 Score</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <span className="text-xs font-bold text-slate-700 block">Layer 2: Fake Name Trap</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Filters out test inputs ("asdf", "test", "demo", "xyz") and ensures real names.
+                  </p>
+                  <span className="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">+25 Score</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <span className="text-xs font-bold text-slate-700 block">Layer 3: Email Validity</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    RFC 5322 syntax validation; boosts genuine business and domain email providers.
+                  </p>
+                  <span className="inline-block px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">+20 Score</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <span className="text-xs font-bold text-slate-700 block">Layer 4: Commercial Intent</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Checks explicit business type (Distributor/Trader) &amp; volume requirement selections.
+                  </p>
+                  <span className="inline-block px-2 py-0.5 rounded bg-purple-50 text-purple-700 text-[10px] font-bold">+20 Score</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1247,7 +1834,613 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Real Field Mapping Modal */}
+        {/* TAB 2: NeoDove CRM & Multi-Webhook Hub */}
+        {activeTab === 'NEODOVE' && (
+          <div className="space-y-6">
+            {/* Top Overview Card */}
+            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 lg:p-7 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-xs">
+                    <Share2 size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-heading font-bold text-slate-900">
+                        NeoDove CRM &amp; Multi-Source Lead Webhook Hub
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Dual Coexistence Active
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Preserve full NeoDove capabilities, receive leads via dual webhooks, and mirror native leads back to NeoDove.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={fetchNeoConfig}
+                    className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={13} />
+                    <span>Refresh Stats</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Real-Time Stats Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/80">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-500 block mb-1">
+                    NeoDove Inbound Leads
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-heading font-extrabold text-indigo-950 tabular-nums">
+                      {neodoveConfig.leadsCaptured || 0}
+                    </span>
+                    <span className="text-[11px] font-medium text-indigo-600">Captured to CRM</span>
+                  </div>
+                  <p className="text-[10px] text-indigo-400 mt-1">
+                    Last received: {neodoveConfig.lastInboundAt ? new Date(neodoveConfig.lastInboundAt).toLocaleString('en-IN') : 'Awaiting first lead'}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100/80">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-blue-500 block mb-1">
+                    Mirrored Out to NeoDove
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-heading font-extrabold text-blue-950 tabular-nums">
+                      {neodoveConfig.leadsSyncedOut || 0}
+                    </span>
+                    <span className="text-[11px] font-medium text-blue-600">Synced to external CRM</span>
+                  </div>
+                  <p className="text-[10px] text-blue-400 mt-1">
+                    Sync Mode: {neodoveConfig.autoSync ? 'Automated Mirroring' : 'Manual / Selective'}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100/80">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-500 block mb-1">
+                    Universal Website Capture
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-heading font-extrabold text-emerald-950 tabular-nums">
+                      Active
+                    </span>
+                    <span className="text-[11px] font-medium text-emerald-600">Zero Loss Engine</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-400 mt-1">
+                    WordPress, Elementor, Webflow &amp; Landing Pages
+                  </p>
+                </div>
+              </div>
+
+              {/* Webhook Endpoints (1-Click Copy) */}
+              <div className="space-y-4 pt-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Live Webhook Ingestion Endpoints
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Endpoint 1: NeoDove Webhook */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-100 text-indigo-700">POST</span>
+                        <span className="font-bold text-xs text-slate-800">NeoDove Inbound Webhook</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                        <Check size={11} /> 200 OK
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Paste this URL into NeoDove Webhook integration panel to mirror every lead into our CRM.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 px-3 py-2 bg-white rounded-xl border border-slate-200 text-[11px] font-mono text-slate-700 select-all overflow-x-auto">
+                        {typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/neodove` : '/api/webhooks/neodove'}
+                      </code>
+                      <button
+                        onClick={() => {
+                          const url = `${window.location.origin}/api/webhooks/neodove`;
+                          navigator.clipboard.writeText(url);
+                          showToast('Copied NeoDove Webhook URL to clipboard!');
+                        }}
+                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                      >
+                        <Copy size={13} /> Copy
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Endpoint 2: Universal Landing Page Webhook */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700">POST</span>
+                        <span className="font-bold text-xs text-slate-800">Website &amp; Landing Page Webhook</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                        <Check size={11} /> 200 OK
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Connect any website form, Elementor, Webflow, or Zapier to auto-ingest and distribute leads.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 px-3 py-2 bg-white rounded-xl border border-slate-200 text-[11px] font-mono text-slate-700 select-all overflow-x-auto">
+                        {typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/leads` : '/api/webhooks/leads'}
+                      </code>
+                      <button
+                        onClick={() => {
+                          const url = `${window.location.origin}/api/webhooks/leads`;
+                          navigator.clipboard.writeText(url);
+                          showToast('Copied Universal Webhook URL to clipboard!');
+                        }}
+                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                      >
+                        <Copy size={13} /> Copy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Outbound NeoDove Mirroring & Sync Configuration */}
+            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 lg:p-7 space-y-6">
+              <div className="pb-4 border-b border-slate-100">
+                <h3 className="text-base font-heading font-bold text-slate-900">
+                  Outbound NeoDove Mirroring (Bidirectional Parity)
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  When enabled, any lead captured via Meta Ads, Website, or CSV will automatically be synced to your external NeoDove CRM.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveNeoConfig} className="space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">Enable NeoDove Outbound Forwarding</span>
+                    <span className="text-[11px] text-slate-500">Forward leads in real-time to external NeoDove endpoint</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={neodoveConfig.enabled || false}
+                      onChange={(e) => setNeodoveConfig({ ...neodoveConfig, enabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      External NeoDove Webhook URL
+                    </label>
+                    <input
+                      type="url"
+                      value={neodoveConfig.webhookUrl || ''}
+                      onChange={(e) => setNeodoveConfig({ ...neodoveConfig, webhookUrl: e.target.value })}
+                      placeholder="https://api.neodove.com/v1/leads/webhook-ingest"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:outline-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      NeoDove API Key / Secret Token (Optional)
+                    </label>
+                    <input
+                      type="password"
+                      value={neodoveConfig.apiKey || ''}
+                      onChange={(e) => setNeodoveConfig({ ...neodoveConfig, apiKey: e.target.value })}
+                      placeholder="nd_live_sk_..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:outline-blue-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">Auto-Sync Ingested Leads</span>
+                    <span className="text-[11px] text-slate-500">Mirror Meta Ads and Website leads immediately upon ingestion</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={neodoveConfig.autoSync || false}
+                      onChange={(e) => setNeodoveConfig({ ...neodoveConfig, autoSync: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={savingNeoConfig}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    {savingNeoConfig ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    <span>Save NeoDove Configuration</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleTestNeoSync}
+                    disabled={testingNeoSync}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {testingNeoSync ? <Loader2 size={14} className="animate-spin text-blue-600" /> : <Send size={14} />}
+                    <span>Dispatch Ping Test</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Live Webhook Ingestion Simulators */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Simulator 1: NeoDove Inbound Simulator */}
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4">
+                <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                  <Radio size={16} className="text-indigo-600" />
+                  <h4 className="text-sm font-bold text-slate-900">Simulate NeoDove Inbound Webhook</h4>
+                </div>
+
+                <form onSubmit={handleSimulateNeoLead} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Prospect Name</label>
+                    <input
+                      type="text"
+                      value={neoSimForm.name}
+                      onChange={(e) => setNeoSimForm({ ...neoSimForm, name: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">Mobile (10 digits)</label>
+                      <input
+                        type="tel"
+                        value={neoSimForm.mobile}
+                        onChange={(e) => setNeoSimForm({ ...neoSimForm, mobile: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">City / District</label>
+                      <input
+                        type="text"
+                        value={neoSimForm.city}
+                        onChange={(e) => setNeoSimForm({ ...neoSimForm, city: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">State / Region</label>
+                      <input
+                        type="text"
+                        value={neoSimForm.state}
+                        onChange={(e) => setNeoSimForm({ ...neoSimForm, state: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">Lead Stage</label>
+                      <select
+                        value={neoSimForm.stage}
+                        onChange={(e) => setNeoSimForm({ ...neoSimForm, stage: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                      >
+                        <option value="New">New</option>
+                        <option value="Contacted">Contacted</option>
+                        <option value="Interested">Interested</option>
+                        <option value="Callback Scheduled">Callback Scheduled</option>
+                        <option value="Converted">Converted</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={simulatingNeoInbound}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    {simulatingNeoInbound ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                    <span>Test NeoDove Lead Ingestion</span>
+                  </button>
+                </form>
+
+                {neoSimResult && (
+                  <div className="p-3.5 bg-indigo-50/60 border border-indigo-200/80 rounded-2xl space-y-1 text-xs">
+                    <div className="flex items-center justify-between text-indigo-900 font-bold">
+                      <span>Ingestion Result:</span>
+                      <span className="text-emerald-700 font-mono">200 OK</span>
+                    </div>
+                    <p className="text-slate-700 font-medium">
+                      Lead ID: <span className="font-bold">{neoSimResult.results?.[0]?.lead_id}</span> • Assigned to: <span className="font-bold text-indigo-700">{neoSimResult.results?.[0]?.assigned_to}</span>
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Routing Strategy: {neoSimResult.results?.[0]?.routingMethod} • Activity logged to timeline
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Simulator 2: Website / Landing Page Simulator */}
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4">
+                <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                  <Globe size={16} className="text-emerald-600" />
+                  <h4 className="text-sm font-bold text-slate-900">Simulate Website Form Ingestion</h4>
+                </div>
+
+                <form onSubmit={handleSimulateWebLead} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Prospect Name</label>
+                    <input
+                      type="text"
+                      value={webSimForm.name}
+                      onChange={(e) => setWebSimForm({ ...webSimForm, name: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">Mobile (10 digits)</label>
+                      <input
+                        type="tel"
+                        value={webSimForm.mobile}
+                        onChange={(e) => setWebSimForm({ ...webSimForm, mobile: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">City / District</label>
+                      <input
+                        type="text"
+                        value={webSimForm.city}
+                        onChange={(e) => setWebSimForm({ ...webSimForm, city: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">State / Region</label>
+                      <input
+                        type="text"
+                        value={webSimForm.state}
+                        onChange={(e) => setWebSimForm({ ...webSimForm, state: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">Campaign Tag</label>
+                      <input
+                        type="text"
+                        value={webSimForm.campaign_name}
+                        onChange={(e) => setWebSimForm({ ...webSimForm, campaign_name: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={simulatingWebInbound}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    {simulatingWebInbound ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                    <span>Test Website Form Ingestion</span>
+                  </button>
+                </form>
+
+                {webSimResult && (
+                  <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl space-y-1 text-xs">
+                    <div className="flex items-center justify-between text-emerald-900 font-bold">
+                      <span>Ingestion Result:</span>
+                      <span className="text-emerald-700 font-mono">200 OK</span>
+                    </div>
+                    <p className="text-slate-700 font-medium">
+                      Lead ID: <span className="font-bold">{webSimResult.results?.[0]?.lead_id}</span> • Assigned to: <span className="font-bold text-emerald-700">{webSimResult.results?.[0]?.assigned_to}</span>
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Routing Strategy: {webSimResult.results?.[0]?.routingMethod} • Activity logged to timeline
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {testLeadModalOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in duration-200">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading font-extrabold text-base text-slate-900 flex items-center gap-2">
+                    <Zap size={18} className="text-amber-500" />
+                    <span>Send Test Meta Lead &amp; Verify DB Ingestion</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Fires a simulated Meta Lead Ads webhook event and tests round-robin assignment &amp; DB storage
+                  </p>
+                </div>
+                <button
+                  onClick={() => setTestLeadModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+                <form onSubmit={handleSendTestLead} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Target Lead Form</label>
+                    <select
+                      value={testLeadFormId}
+                      onChange={(e) => setTestLeadFormId(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                    >
+                      {(status?.metaForms || []).map((f) => (
+                        <option key={f.formId} value={f.formId}>
+                          {f.formName} ({f.formId})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Prospect Full Name</label>
+                      <input
+                        type="text"
+                        value={testLeadName}
+                        onChange={(e) => setTestLeadName(e.target.value)}
+                        placeholder="Vikramaditya Verma"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Number (10 digits)</label>
+                      <input
+                        type="tel"
+                        value={testLeadPhone}
+                        onChange={(e) => setTestLeadPhone(e.target.value)}
+                        placeholder="9876543299"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        value={testLeadEmail}
+                        onChange={(e) => setTestLeadEmail(e.target.value)}
+                        placeholder="vikram.verma@example.com"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">City / District</label>
+                      <input
+                        type="text"
+                        value={testLeadCity}
+                        onChange={(e) => setTestLeadCity(e.target.value)}
+                        placeholder="Varanasi"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Business Type (Custom Hindi Answer)</label>
+                      <input
+                        type="text"
+                        value={testLeadBusiness}
+                        onChange={(e) => setTestLeadBusiness(e.target.value)}
+                        placeholder="डिस्ट्रीब्यूटर (Distributor)"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Product Requirement (Custom Answer)</label>
+                      <input
+                        type="text"
+                        value={testLeadProduct}
+                        onChange={(e) => setTestLeadProduct(e.target.value)}
+                        placeholder="Mustard Oil (15L Tin) Bulk Dealership"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      disabled={sendingTestLead}
+                      className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold flex items-center gap-2 cursor-pointer shadow-sm"
+                    >
+                      {sendingTestLead ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                      <span>Trigger Real Ingestion Now</span>
+                    </button>
+                  </div>
+                </form>
+
+                {/* Test Lead Verification Result */}
+                {testLeadResult && (
+                  <div className={`p-4 rounded-2xl border text-xs space-y-2 animate-in fade-in ${
+                    testLeadResult.success ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-red-50 border-red-200 text-red-950'
+                  }`}>
+                    <div className="font-bold flex items-center gap-2 text-emerald-800">
+                      <CheckCircle2 size={16} />
+                      <span>{testLeadResult.message}</span>
+                    </div>
+
+                    {testLeadResult.lead && (
+                      <div className="space-y-1.5 pt-1 text-[11px]">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>CRM Lead ID: <strong className="text-blue-700 font-mono">{testLeadResult.lead.lead_id}</strong></div>
+                          <div>Assigned Agent: <strong className="text-slate-900">{testLeadResult.lead.assignedTo}</strong></div>
+                          <div>Prospect: <strong className="text-slate-900">{testLeadResult.lead.name}</strong></div>
+                          <div>Mobile: <strong className="text-slate-900">{testLeadResult.lead.mobile}</strong></div>
+                          <div>City: <strong className="text-slate-900">{testLeadResult.lead.city || 'N/A'}</strong></div>
+                          <div>Intent Score: <strong className="text-emerald-700">{testLeadResult.lead.qualityScore}/100 ({testLeadResult.lead.qualityTier})</strong></div>
+                        </div>
+                        <div className="text-slate-600 border-t border-emerald-200 pt-1">
+                          Product / Business: <strong>{testLeadResult.lead.product_interest}</strong>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono">
+                          Meta Leadgen ID: {testLeadResult.lead.meta_lead_id}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50/50">
+                <button
+                  onClick={() => setTestLeadModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL 2: Field Mapping Modal */}
         {isMappingModalOpen && editingForm && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in duration-200">

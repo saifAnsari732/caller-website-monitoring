@@ -79,7 +79,7 @@ export async function GET() {
         { notes: { $regex: 'Meta', $options: 'i' } }
       ]
     })
-      .select('campaign_name notes')
+      .select('campaign_name notes meta_form_id')
       .lean();
 
     const totalDbMetaLeads = dbMetaLeads.length;
@@ -94,8 +94,9 @@ export async function GET() {
       for (const l of dbMetaLeads) {
         const notes = l.notes || '';
         const camp = l.campaign_name || '';
+        const metaFormId = l.meta_form_id || '';
         if (
-          (idStr && notes.includes(idStr)) ||
+          (idStr && (metaFormId === idStr || notes.includes(idStr))) ||
           (nameRegex && (nameRegex.test(notes) || camp.trim().toLowerCase() === form.name.trim().toLowerCase()))
         ) {
           dbCount++;

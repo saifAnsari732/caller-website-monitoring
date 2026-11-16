@@ -269,6 +269,20 @@ export default function DistributionPage() {
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
                 />
               </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Lead Source</label>
+                <select
+                  value={newRule.source}
+                  onChange={e => setNewRule({ ...newRule, source: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
+                >
+                  <option value="ALL">ALL Sources</option>
+                  <option value="Facebook Meta Lead Ads">Facebook Meta Lead Ads</option>
+                  <option value="NeoDove">NeoDove Inbound</option>
+                  <option value="Website Landing Page">Website Landing Page</option>
+                  <option value="CSV Bulk Import">CSV Bulk Import</option>
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Match Field</label>

@@ -101,7 +101,10 @@ export async function GET(request) {
         ]
       };
     } else {
-      const orClauses = [{ notes: { $regex: escapeRegex(requestedFormId), $options: 'i' } }];
+      const orClauses = [
+        { meta_form_id: requestedFormId },
+        { notes: { $regex: escapeRegex(requestedFormId), $options: 'i' } }
+      ];
       if (formName) {
         const escapedName = escapeRegex(formName.trim());
         orClauses.push({ notes: { $regex: `"${escapedName}"`, $options: 'i' } });
@@ -185,6 +188,7 @@ export async function GET(request) {
       success: true,
       formId: requestedFormId,
       formDetails,
+      total: mergedLeads.length,
       totalFetched: mergedLeads.length,
       leads: mergedLeads
     });

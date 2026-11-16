@@ -7,7 +7,10 @@
     "clean": "node -e \"const fs=require('fs'); if(fs.existsSync('.next')) fs.rmSync('.next', {recursive:true, force:true}); console.log('Cleaned .next cache successfully.');\"",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node scripts/test-crm-neodove-suite.js && node scripts/test-concurrency-dedup.js",
+    "test:crm": "node scripts/test-crm-neodove-suite.js",
+    "test:concurrency": "node scripts/test-concurrency-dedup.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

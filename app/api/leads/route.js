@@ -4,34 +4,19 @@ import Lead from '../../../lib/models/Lead';
 import User from '../../../lib/models/User';
 import Call from '../../../lib/models/Call';
 import Followup from '../../../lib/models/Followup';
+import LeadActivity from '../../../lib/models/LeadActivity';
 import SystemSetting from '../../../lib/models/SystemSetting';
+import Counter from '../../../lib/models/Counter';
 import { purgeDashboardCache, getLeadFilterForAdmin } from '../../../lib/cache';
 import { requireAdminApi } from '../../../lib/auth';
+import { routeLead } from '../../../lib/leadRouter';
+import { normalizeStage } from '../../../lib/leadDispositions';
+import { dispatchChannelAlerts } from '../../../lib/channelAlerts';
+import { syncLeadToNeoDove } from '../../../lib/neodoveSync';
+import { getOrInitSettings } from '../../../lib/settings';
+import { ingestLead } from '../../../lib/leadIngestionEngine';
 
 export const dynamic = 'force-dynamic';
-
-async function pickCallerForDistribution(activeCallers, strategy) {
-  if (!activeCallers || activeCallers.length === 0) return null;
-
-  if (strategy === 'LOAD_BALANCED') {
-    const counts = await Promise.all(
-      activeCallers.map(async (c) => {
-        const count = await Lead.countDocuments({
-          assigned_to: c._id,
-          status: { $in: ['Fresh Lead', 'Assigned', 'Follow Up', 'Callback'] }
-        });
-        return { caller: c, count };
-      })
-    );
-    counts.sort((a, b) => a.count - b.count);
-    return counts[0].caller;
-  }
-
-  const lastLead = await Lead.findOne({ assigned_to: { $ne: null } }).sort({ assigned_at: -1 }).lean();
-  if (!lastLead || !lastLead.assigned_to) return activeCallers[0];
-  const idx = activeCallers.findIndex(c => c._id.toString() === lastLead.assigned_to.toString());
-  return activeCallers[(idx + 1) % activeCallers.length];
-}
 
 export async function GET(request) {
   try {
@@ -45,13 +30,14 @@ export async function GET(request) {
     const detailId = searchParams.get('detailId') || '';
 
     if (detailId) {
-      const [lead, calls, followups] = await Promise.all([
+      const [lead, calls, followups, activities] = await Promise.all([
         Lead.findOne({ _id: detailId, ...leadFilter }).populate('assigned_to', 'name mobile employee_id').lean(),
         Call.find({ lead: detailId }).populate('caller', 'name').sort({ start_time: -1 }).lean(),
-        Followup.find({ lead: detailId }).populate('caller', 'name').sort({ date: -1, time: -1 }).lean()
+        Followup.find({ lead: detailId }).populate('caller', 'name').sort({ date: -1, time: -1 }).lean(),
+        LeadActivity.find({ lead: detailId }).sort({ createdAt: -1 }).lean()
       ]);
       if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
-      return NextResponse.json({ lead, calls, followups });
+      return NextResponse.json({ lead, calls, followups, activities });
     }
 
     const search = searchParams.get('search') || '';
@@ -179,67 +165,43 @@ export async function POST(request) {
     if (Array.isArray(body.leads)) {
       const createdLeads = [];
       for (const item of body.leads) {
-        const mobileVal = String(item.mobile || '').trim();
-        if (!item.name || !mobileVal) continue;
-        const chosenCaller = await pickCallerForDistribution(activeCallers, strategy);
-        const doc = await Lead.create({
-          admin_id: adminPayload.id,
-          name: String(item.name).trim(),
-          mobile: mobileVal,
-          email: (item.email || '').trim(),
-          city: (item.city || '').trim(),
-          state: (item.state || '').trim(),
-          business_type: (item.business_type || '').trim(),
-          product_interest: (item.product_interest || '').trim(),
-          lead_source: item.lead_source || 'CSV Bulk Import',
-          campaign_name: (item.campaign_name || '').trim(),
-          status: chosenCaller ? 'Assigned' : 'Fresh Lead',
-          assigned_to: chosenCaller ? chosenCaller._id : null,
-          assigned_at: chosenCaller ? new Date() : null,
-          notes: item.notes || ''
+        if (!item.name || !item.mobile) continue;
+        const res = await ingestLead(item, {
+          source: item.lead_source || 'CSV Bulk Import',
+          defaultCampaign: item.campaign_name || 'CSV Upload Campaign',
+          adminId: adminPayload.id
         });
-        createdLeads.push(doc);
+        if (res.lead) createdLeads.push(res.lead);
       }
       purgeDashboardCache(adminPayload.id);
       return NextResponse.json({ success: true, count: createdLeads.length }, { status: 201 });
     }
 
-    const { name, mobile, email, city, state, business_type, product_interest, lead_source, campaign_name, assigned_to, notes } = body;
+    const { name, mobile } = body;
     if (!name || !mobile) {
       return NextResponse.json({ error: 'Name and mobile are required' }, { status: 400 });
     }
 
-    let targetCallerId = assigned_to || null;
-    if (!targetCallerId) {
-      const chosen = await pickCallerForDistribution(activeCallers, strategy);
-      if (chosen) targetCallerId = chosen._id;
-    }
-
-    const newLead = await Lead.create({
-      admin_id: adminPayload.id,
-      name: String(name).trim(),
-      mobile: String(mobile).trim(),
-      email: (email || '').trim(),
-      city: (city || '').trim(),
-      state: (state || '').trim(),
-      business_type: (business_type || '').trim(),
-      product_interest: (product_interest || '').trim(),
-      join_as: (body.join_as || business_type || '').trim(),
-      start_timeline: (body.start_timeline || product_interest || '').trim(),
-      deal_amount: Number(body.deal_amount) || 0,
-      follow_up_time: body.follow_up_time ? new Date(body.follow_up_time) : null,
-      lead_status: body.lead_status || 'In-Progress',
-      lead_source: lead_source || 'Admin Manual Entry',
-      campaign_name: (campaign_name || '').trim(),
-      status: targetCallerId ? 'Assigned' : 'Fresh Inquiry',
-      assigned_to: targetCallerId,
-      assigned_at: targetCallerId ? new Date() : null,
-      notes: notes || ''
+    const ingestionResult = await ingestLead(body, {
+      source: body.lead_source || 'Admin Manual Entry',
+      defaultCampaign: body.campaign_name || 'Direct Entry',
+      adminId: adminPayload.id,
+      assignedCallerId: body.assigned_to || null,
+      skipAlerts: !body.triggerAlert
     });
 
+    const leadDoc = ingestionResult.lead;
+    const populated = leadDoc
+      ? await Lead.findById(leadDoc._id).populate('assigned_to', 'name _id mobile employee_id').lean()
+      : null;
+
     purgeDashboardCache(adminPayload.id);
-    const populated = await Lead.findById(newLead._id).populate('assigned_to', 'name _id mobile').lean();
-    return NextResponse.json({ success: true, lead: populated }, { status: 201 });
+    return NextResponse.json({
+      success: true,
+      lead: populated,
+      isRepeat: Boolean(ingestionResult.isRepeat),
+      action: ingestionResult.action
+    }, { status: 201 });
   } catch (error) {
     console.error('Leads POST error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -296,7 +258,14 @@ export async function PATCH(request) {
           activeCallers = await User.find({ role: 'telecaller', status: { $in: ['active', 'ACTIVE'] } }).sort({ _id: 1 });
         }
         if (activeCallers.length > 0) {
-          let idx = 0;
+          const counter = await Counter.findOneAndUpdate(
+            { _id: 'rr_bulk_assign' },
+            { $inc: { seq: body.leadIds.length } },
+            { returnDocument: 'after', upsert: true }
+          );
+          let startIdx = ((counter?.seq || body.leadIds.length) - body.leadIds.length) % activeCallers.length;
+          if (startIdx < 0) startIdx = 0;
+          let idx = startIdx;
           for (const leadId of body.leadIds) {
             const caller = activeCallers[idx % activeCallers.length];
             await Lead.findByIdAndUpdate(leadId, {
@@ -332,6 +301,21 @@ export async function PATCH(request) {
         { _id: { $in: body.leadIds } },
         { $set: updateSet }
       );
+
+      // Log LeadActivity for bulk operations
+      try {
+        const activities = body.leadIds.map(id => ({
+          lead: id,
+          performer_name: 'Administrator',
+          performer_role: 'admin',
+          type: updateSet.status ? 'DISPOSITION_LOGGED' : 'LEAD_ASSIGNED',
+          title: updateSet.status ? `Bulk Disposition: ${updateSet.status}` : 'Bulk Reassigned',
+          description: `Updated via Bulk CRM Operations.`,
+          metadata: updateSet
+        }));
+        await LeadActivity.insertMany(activities).catch(() => {});
+      } catch {}
+
       purgeDashboardCache();
       return NextResponse.json({ success: true, count: body.leadIds.length });
     }
@@ -354,10 +338,19 @@ export async function PATCH(request) {
       follow_up_time,
       join_as,
       start_timeline,
-      call_attempts
+      call_attempts,
+      sub_disposition,
+      custom_fields,
+      performer_name,
+      performer_role
     } = body;
     if (!leadId) {
       return NextResponse.json({ error: 'Lead ID required' }, { status: 400 });
+    }
+
+    const currentLead = await Lead.findById(leadId).populate('assigned_to', 'name');
+    if (!currentLead) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
     }
 
     const updateData = {};
@@ -373,7 +366,7 @@ export async function PATCH(request) {
       updateData.assigned_at = assigned_to ? new Date() : null;
       if (assigned_to && !status) updateData.status = 'Assigned';
     }
-    if (status !== undefined) updateData.status = status;
+    if (status !== undefined) updateData.status = normalizeStage(status);
     if (notes !== undefined) updateData.notes = notes;
     if (priority !== undefined) updateData.priority = priority;
     if (lead_status !== undefined) updateData.lead_status = lead_status;
@@ -382,12 +375,70 @@ export async function PATCH(request) {
     if (join_as !== undefined) updateData.join_as = String(join_as).trim();
     if (start_timeline !== undefined) updateData.start_timeline = String(start_timeline).trim();
     if (call_attempts !== undefined) updateData.call_attempts = Number(call_attempts) || 0;
+    if (sub_disposition !== undefined) updateData.sub_disposition = String(sub_disposition).trim();
+    if (custom_fields !== undefined) updateData.custom_fields = custom_fields;
 
     const updatedLead = await Lead.findByIdAndUpdate(
       leadId,
       { $set: updateData },
       { new: true }
     ).populate('assigned_to', 'name _id mobile');
+
+    // 1. Log Activity if Stage/Disposition changed
+    const norm = status !== undefined ? normalizeStage(status) : currentLead.status;
+    const stageChanged = status !== undefined && norm !== currentLead.status;
+    const subDispChanged = sub_disposition !== undefined && String(sub_disposition).trim() !== String(currentLead.sub_disposition || '').trim();
+
+    if (stageChanged || subDispChanged) {
+      await LeadActivity.create({
+        lead: leadId,
+        admin_id: updatedLead.admin_id || null,
+        performed_by: updateData.assigned_to || currentLead.assigned_to?._id || null,
+        performer_name: performer_name || currentLead.assigned_to?.name || 'Administrator',
+        performer_role: performer_role || 'admin',
+        type: 'DISPOSITION_LOGGED',
+        title: `Disposition Logged: ${norm}`,
+        description: stageChanged
+          ? `Stage changed from "${currentLead.status}" to "${norm}". ${sub_disposition ? `Reason: ${sub_disposition}` : ''}`
+          : `Sub-disposition recorded: "${sub_disposition}".`,
+        metadata: {
+          old_status: currentLead.status,
+          new_status: norm,
+          sub_disposition: sub_disposition || currentLead.sub_disposition || '',
+          deal_amount: updateData.deal_amount || currentLead.deal_amount
+        }
+      }).catch(() => {});
+    }
+
+    // 2. Log Activity if Telecaller Reassigned
+    if (assigned_to !== undefined && String(assigned_to) !== String(currentLead.assigned_to?._id || '')) {
+      await LeadActivity.create({
+        lead: leadId,
+        admin_id: updatedLead.admin_id || null,
+        performer_name: performer_name || 'Administrator',
+        performer_role: performer_role || 'admin',
+        type: 'LEAD_ASSIGNED',
+        title: updateData.assigned_to ? `Re-assigned to ${updatedLead.assigned_to?.name || 'Caller'}` : 'Lead Unassigned',
+        description: updateData.assigned_to
+          ? `Lead manually reassigned to ${updatedLead.assigned_to?.name}.`
+          : 'Lead removed from caller assignment pool.',
+        metadata: { assigned_to: updateData.assigned_to }
+      }).catch(() => {});
+    }
+
+    // 3. Log Activity if Note Added
+    if (notes !== undefined && notes !== currentLead.notes && notes.trim().length > 0) {
+      await LeadActivity.create({
+        lead: leadId,
+        admin_id: updatedLead.admin_id || null,
+        performer_name: performer_name || 'Administrator',
+        performer_role: performer_role || 'admin',
+        type: 'NOTE_ADDED',
+        title: 'Note Recorded',
+        description: notes,
+        metadata: { notes }
+      }).catch(() => {});
+    }
 
     purgeDashboardCache();
     return NextResponse.json({ success: true, lead: updatedLead });

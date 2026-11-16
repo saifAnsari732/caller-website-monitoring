@@ -66,9 +66,9 @@ export async function POST(request) {
     const body = await request.json();
     const settings = await getOrInitSettings();
 
-    const adAccountId = process.env.META_AD_ACCOUNT_ID || 'act_1796071777698019';
-    const userToken = process.env.META_USER_ACCESS_TOKEN || '';
-    const pageToken = process.env.META_PAGE_ACCESS_TOKEN || settings.metaConfig?.accessToken || '';
+    const adAccountId = settings.metaConfig?.adAccountId || process.env.META_AD_ACCOUNT_ID || 'act_1796071777698019';
+    const userToken = settings.metaConfig?.userAccessToken || process.env.META_USER_ACCESS_TOKEN || '';
+    const pageToken = settings.metaConfig?.accessToken || process.env.META_PAGE_ACCESS_TOKEN || '';
     const token = userToken || pageToken;
 
     if (body.action === 'SYNC_ALL_CAMPAIGNS') {

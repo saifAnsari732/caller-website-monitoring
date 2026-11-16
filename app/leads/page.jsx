@@ -26,15 +26,28 @@ import {
   Eye,
   ShieldAlert,
   Check,
-  ExternalLink
+  ExternalLink,
+  Send,
+  Zap,
+  CheckCircle2,
+  Activity,
+  FileText,
+  PhoneCall
 } from 'lucide-react';
 
 const STAGE_OPTIONS = [
+  'New',
+  'Contacted',
+  'Interested',
+  'Callback Scheduled',
+  'Follow-up',
+  'Not Interested',
+  'Converted',
+  'Lost',
   'Fresh Inquiry',
   'Fresh Lead',
   'Assigned',
   'Connected',
-  'Interested',
   'Distributor Interested',
   'Trader Interested',
   'Follow Up',
@@ -46,6 +59,55 @@ const STAGE_OPTIONS = [
 ];
 
 const TAG_OPTIONS = ['Hot', 'Warm', 'Cold', 'VIP'];
+
+const SUB_DISPOSITIONS_BY_STAGE = {
+  'New': ['Fresh Ingestion', 'Re-assigned to Agent', 'High Priority Inflow'],
+  'Contacted': ['Introduction Made', 'Discussion Underway', 'Decision Maker Identified', 'Requested More Info'],
+  'Interested': [
+    'Distributor Dealership Inquiry',
+    'Trader / Wholesaler Inquiry',
+    'Bulk Order (15L Tin)',
+    'Super Stockist (SS) Partnership',
+    'Retail Chain Placement',
+    'Sample Tin Requested'
+  ],
+  'Callback Scheduled': [
+    'Prospect Busy / In Meeting',
+    'Call During Evening',
+    'Call Next Day Morning',
+    'Consulting Business Partner',
+    'Specific Time Requested'
+  ],
+  'Follow-up': [
+    'Catalog & Brochure Shared on WhatsApp',
+    'Price Quotation Shared',
+    'Margin Structure Under Discussion',
+    'Field Visit / Meeting Planned',
+    'GST & Dealership Docs Requested'
+  ],
+  'Not Interested': [
+    'Profit Margin Expectations High',
+    'Competitor Exclusive Contract',
+    'Out of Distribution Area',
+    'No Financial Budget',
+    'Not In Oil Business',
+    'Casual Inquiry / No Current Need'
+  ],
+  'Converted': [
+    'Advance Payment Received',
+    'First Consignment Dispatched',
+    'Dealership Agreement Executed',
+    'Security Deposit Received',
+    'Authorized Distributor Appointed'
+  ],
+  'Lost': [
+    'Wrong Number / Not User',
+    'Switched Off Repeatedly',
+    'Continuous Ringing No Response',
+    'Language / Communication Barrier',
+    'Duplicate / Spam Submission'
+  ]
+};
 
 function formatLeadDate(dateVal) {
   if (!dateVal) return '—';
@@ -100,6 +162,14 @@ export default function LeadsPage() {
   const [inspectorLeadId, setInspectorLeadId] = useState(null);
   const [inspectorData, setInspectorData] = useState(null);
   const [loadingInspector, setLoadingInspector] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState('TIMELINE'); // 'TIMELINE' | 'DISPOSITION' | 'ALERT' | 'CALLS'
+  const [dispStage, setDispStage] = useState('Interested');
+  const [dispSub, setDispSub] = useState('');
+  const [dispNotes, setDispNotes] = useState('');
+  const [savingDisposition, setSavingDisposition] = useState(false);
+  const [alertCategory, setAlertCategory] = useState('Welcome');
+  const [alertChannel, setAlertChannel] = useState('WHATSAPP');
+  const [sendingAlert, setSendingAlert] = useState(false);
 
   // Column visibility matching NeoDove specifications
   const [showColMenu, setShowColMenu] = useState(false);
@@ -426,10 +496,73 @@ export default function LeadsPage() {
       const res = await fetch(`/api/leads?detailId=${leadId}`);
       const data = await res.json();
       setInspectorData(data);
+      if (data?.lead?.status) setDispStage(data.lead.status);
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingInspector(false);
+    }
+  };
+
+  const handleSaveDrawerDisposition = async (e) => {
+    e?.preventDefault();
+    if (!inspectorData?.lead?._id) return;
+    setSavingDisposition(true);
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: inspectorData.lead._id,
+          status: dispStage,
+          sub_disposition: dispSub,
+          notes: dispNotes ? `${inspectorData.lead.notes || ''}\n[Disposition Note]: ${dispNotes}` : undefined,
+          performer_name: 'CRM Portal'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Lead disposition updated to "${dispStage}"!`);
+        openInspector(inspectorData.lead._id);
+        fetchLeads();
+        setDispNotes('');
+        setInspectorTab('TIMELINE');
+      } else {
+        showToast('Failed to update disposition: ' + (data.error || 'Error'));
+      }
+    } catch (err) {
+      showToast('Error: ' + err.message);
+    } finally {
+      setSavingDisposition(false);
+    }
+  };
+
+  const handleSendDrawerAlert = async (e) => {
+    e?.preventDefault();
+    if (!inspectorData?.lead?._id) return;
+    setSendingAlert(true);
+    try {
+      const res = await fetch('/api/alerts/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: inspectorData.lead._id,
+          templateCategory: alertCategory,
+          channels: [alertChannel]
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Instant ${alertChannel} alert dispatched for ${inspectorData.lead.name}!`);
+        openInspector(inspectorData.lead._id);
+        setInspectorTab('TIMELINE');
+      } else {
+        showToast('Alert dispatch failed: ' + (data.error || 'Error'));
+      }
+    } catch (err) {
+      showToast('Error: ' + err.message);
+    } finally {
+      setSendingAlert(false);
     }
   };
 
@@ -1479,27 +1612,65 @@ export default function LeadsPage() {
                 <Loader2 size={28} className="animate-spin text-blue-600" />
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                <div className="flex items-center gap-3">
-                  <a
-                    href={`https://wa.me/91${String(inspectorData.lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${inspectorData.lead.name} ji, regarding your inquiry.`)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                  >
-                    <MessageCircle size={15} /> WhatsApp Chat
-                  </a>
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                {/* Top Lead Info & Source Badge */}
+                <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      {inspectorData.lead.lead_source || 'Meta Ads'}
+                    </span>
+                    {inspectorData.lead.neodove_lead_id && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                        NeoDove ID: {inspectorData.lead.neodove_lead_id}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Status: <span className="text-blue-600">{inspectorData.lead.status || 'Fresh Inquiry'}</span>
+                  </span>
+                </div>
+
+                {/* Quick Action Navigation Bar */}
+                <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl text-xs font-bold text-slate-600">
                   <button
-                    onClick={() => {
-                      setEditingLead({ ...inspectorData.lead });
-                      setInspectorLeadId(null);
-                    }}
-                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                    onClick={() => setInspectorTab('TIMELINE')}
+                    className={`py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                      inspectorTab === 'TIMELINE' ? 'bg-white text-blue-600 shadow-2xs font-extrabold' : 'hover:text-slate-900'
+                    }`}
                   >
-                    <Edit3 size={15} /> Edit Details
+                    <Activity size={13} />
+                    <span>Timeline</span>
+                  </button>
+                  <button
+                    onClick={() => setInspectorTab('DISPOSITION')}
+                    className={`py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                      inspectorTab === 'DISPOSITION' ? 'bg-white text-blue-600 shadow-2xs font-extrabold' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>Disposition</span>
+                  </button>
+                  <button
+                    onClick={() => setInspectorTab('ALERT')}
+                    className={`py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                      inspectorTab === 'ALERT' ? 'bg-white text-blue-600 shadow-2xs font-extrabold' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    <Send size={13} />
+                    <span>Alerts</span>
+                  </button>
+                  <button
+                    onClick={() => setInspectorTab('CALLS')}
+                    className={`py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                      inspectorTab === 'CALLS' ? 'bg-white text-blue-600 shadow-2xs font-extrabold' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    <PhoneCall size={13} />
+                    <span>Calls ({inspectorData.calls?.length || 0})</span>
                   </button>
                 </div>
 
+                {/* Lead Summary Matrix */}
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <p className="text-slate-400 font-semibold">Mobile Number</p>
@@ -1514,46 +1685,248 @@ export default function LeadsPage() {
                     <p className="font-bold text-blue-600 mt-0.5">{inspectorData.lead.assigned_to?.name || 'Unassigned'}</p>
                   </div>
                   <div>
-                    <p className="text-slate-400 font-semibold">Pipeline Stage</p>
-                    <p className="font-bold text-slate-900 mt-0.5">{inspectorData.lead.status || 'Fresh Inquiry'}</p>
+                    <p className="text-slate-400 font-semibold">City / State</p>
+                    <p className="font-bold text-slate-900 mt-0.5">{inspectorData.lead.city || '—'}, {inspectorData.lead.state || '—'}</p>
                   </div>
                   <div>
                     <p className="text-slate-400 font-semibold">Created Date</p>
                     <p className="font-medium text-slate-700 mt-0.5">{formatLeadDate(inspectorData.lead.createdAt)}</p>
                   </div>
                   <div>
-                    <p className="text-slate-400 font-semibold">Last Updated</p>
-                    <p className="font-medium text-slate-700 mt-0.5">{formatLeadDate(inspectorData.lead.updatedAt || inspectorData.lead.createdAt)}</p>
+                    <p className="text-slate-400 font-semibold">Sub-Disposition</p>
+                    <p className="font-medium text-slate-700 mt-0.5">{inspectorData.lead.sub_disposition || '—'}</p>
                   </div>
                 </div>
 
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                    Call Logs History ({inspectorData.calls?.length || 0})
-                  </h4>
-                  {(!inspectorData.calls || inspectorData.calls.length === 0) ? (
-                    <p className="text-xs text-slate-400 italic bg-slate-50 p-4 rounded-xl border border-slate-100">
-                      No calls logged yet by mobile app telecallers.
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {inspectorData.calls.map((c) => (
-                        <div key={c._id} className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold text-[11px] rounded">
-                              {c.status}
-                            </span>
-                            <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
-                              <Clock size={11} /> {c.duration}s • {new Date(c.start_time).toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-700 font-medium">{c.notes || 'No discussion notes.'}</p>
-                          <p className="text-[10px] text-slate-400 font-semibold">Caller: {c.caller?.name || 'Telecaller'}</p>
-                        </div>
-                      ))}
+                {/* TAB 1: Unified Activity Timeline */}
+                {inspectorTab === 'TIMELINE' && (
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                      <span>Lead Journey Timeline ({inspectorData.activities?.length || 0} events)</span>
+                      <span className="text-[10px] text-blue-600 normal-case font-semibold">Real-Time Audit Trail</span>
+                    </h4>
+
+                    {(!inspectorData.activities || inspectorData.activities.length === 0) ? (
+                      <p className="text-xs text-slate-400 italic bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        No activity records found yet. Ingestion recorded at {formatLeadDate(inspectorData.lead.createdAt)}.
+                      </p>
+                    ) : (
+                      <div className="relative pl-6 space-y-4 before:content-[''] before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                        {inspectorData.activities.map((act) => {
+                          let badgeBg = 'bg-blue-500';
+                          if (act.type === 'LEAD_CREATED') badgeBg = 'bg-emerald-500';
+                          if (act.type === 'LEAD_ASSIGNED') badgeBg = 'bg-purple-500';
+                          if (act.type === 'DISPOSITION_LOGGED' || act.type === 'STATUS_CHANGE') badgeBg = 'bg-amber-500';
+                          if (act.type === 'CALL_LOGGED') badgeBg = 'bg-blue-600';
+                          if (act.type === 'WHATSAPP_SENT') badgeBg = 'bg-emerald-600';
+                          if (act.type === 'SMS_SENT') badgeBg = 'bg-slate-700';
+                          if (act.type === 'NEODOVE_SYNC') badgeBg = 'bg-indigo-600';
+
+                          return (
+                            <div key={act._id} className="relative group">
+                              <span className={`absolute -left-6 top-1 w-3 h-3 rounded-full ${badgeBg} ring-4 ring-white shadow-xs`}></span>
+                              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-slate-900">{act.title}</span>
+                                  <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                                    <Clock size={10} />
+                                    {new Date(act.createdAt).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                {act.description && (
+                                  <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                                    {act.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400 font-semibold border-t border-slate-100">
+                                  <span>By: {act.performer_name || 'System'} ({act.performer_role})</span>
+                                  {act.metadata?.status && (
+                                    <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-mono">
+                                      {act.metadata.status}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 2: Quick Disposition Logger */}
+                {inspectorTab === 'DISPOSITION' && (
+                  <form onSubmit={handleSaveDrawerDisposition} className="space-y-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                    <div>
+                      <label className="block text-slate-700 font-bold mb-1">Update Pipeline Stage</label>
+                      <select
+                        value={dispStage}
+                        onChange={(e) => {
+                          setDispStage(e.target.value);
+                          setDispSub('');
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900"
+                      >
+                        {STAGE_OPTIONS.map((st) => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
                     </div>
-                  )}
-                </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-slate-700 font-bold">Sub-Disposition / Call Outcome</label>
+                        <span className="text-[10px] text-blue-600 font-semibold">1-Click Suggestions</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={dispSub}
+                        onChange={(e) => setDispSub(e.target.value)}
+                        placeholder="Select quick chip below or type custom reason..."
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-medium"
+                      />
+                      {/* Predefined Canonical Sub-disposition Chips */}
+                      {SUB_DISPOSITIONS_BY_STAGE[dispStage] && SUB_DISPOSITIONS_BY_STAGE[dispStage].length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {SUB_DISPOSITIONS_BY_STAGE[dispStage].map((sub) => (
+                            <button
+                              key={sub}
+                              type="button"
+                              onClick={() => setDispSub(sub)}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-semibold border cursor-pointer transition-colors ${
+                                dispSub === sub
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
+                              }`}
+                            >
+                              {sub}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-bold mb-1">Discussion Notes</label>
+                      <textarea
+                        rows={3}
+                        value={dispNotes}
+                        onChange={(e) => setDispNotes(e.target.value)}
+                        placeholder="Key talking points, budget details, customer response..."
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900"
+                      ></textarea>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={savingDisposition}
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                    >
+                      {savingDisposition ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                      <span>Save Disposition &amp; Update Timeline</span>
+                    </button>
+                  </form>
+                )}
+
+                {/* TAB 3: Instant Multi-Channel Alerts */}
+                {inspectorTab === 'ALERT' && (
+                  <form onSubmit={handleSendDrawerAlert} className="space-y-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                    <div>
+                      <label className="block text-slate-700 font-bold mb-1">Dispatch Channel</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAlertChannel('WHATSAPP')}
+                          className={`py-2 rounded-xl border flex items-center justify-center gap-1.5 cursor-pointer font-bold ${
+                            alertChannel === 'WHATSAPP' ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs' : 'bg-white text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          <MessageCircle size={14} /> WhatsApp
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAlertChannel('SMS')}
+                          className={`py-2 rounded-xl border flex items-center justify-center gap-1.5 cursor-pointer font-bold ${
+                            alertChannel === 'SMS' ? 'bg-slate-900 text-white border-slate-900 shadow-2xs' : 'bg-white text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          <Send size={14} /> SMS Alert
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-bold mb-1">Message Template Category</label>
+                      <select
+                        value={alertCategory}
+                        onChange={(e) => setAlertCategory(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-900"
+                      >
+                        <option value="Welcome">Welcome &amp; Introduction</option>
+                        <option value="Interested">Dealership &amp; Distributorship Info</option>
+                        <option value="Callback">Scheduled Callback Reminder</option>
+                        <option value="General">General Inquiry Follow-up</option>
+                      </select>
+                    </div>
+
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 text-slate-600 space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recipient</p>
+                      <p className="font-bold text-slate-900">{inspectorData.lead.name} (+91 {inspectorData.lead.mobile})</p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={sendingAlert}
+                        className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                      >
+                        {sendingAlert ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        <span>Trigger Instant Alert</span>
+                      </button>
+
+                      <a
+                        href={`https://wa.me/91${String(inspectorData.lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${inspectorData.lead.name} ji, regarding your Kisan Choice Mustard Oil inquiry.`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <MessageCircle size={15} /> Chat
+                      </a>
+                    </div>
+                  </form>
+                )}
+
+                {/* TAB 4: Call Logs */}
+                {inspectorTab === 'CALLS' && (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+                      Call Logs History ({inspectorData.calls?.length || 0})
+                    </h4>
+                    {(!inspectorData.calls || inspectorData.calls.length === 0) ? (
+                      <p className="text-xs text-slate-400 italic bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        No calls logged yet by mobile app telecallers.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {inspectorData.calls.map((c) => (
+                          <div key={c._id} className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1.5 shadow-2xs">
+                            <div className="flex items-center justify-between">
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold text-[11px] rounded">
+                                {c.status}
+                              </span>
+                              <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                                <Clock size={11} /> {c.duration}s • {new Date(c.start_time).toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-700 font-medium">{c.notes || 'No discussion notes.'}</p>
+                            <p className="text-[10px] text-slate-400 font-semibold">Caller: {c.caller?.name || 'Telecaller'}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

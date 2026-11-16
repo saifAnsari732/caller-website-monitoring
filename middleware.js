@@ -28,8 +28,12 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
-  // 3. Extract and verify session token
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  // 3. Extract and verify session token (supports cookie and Bearer header)
+  const authHeader = request.headers.get('authorization');
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value || bearerToken;
+  const apiKey = request.headers.get('x-api-key') || request.headers.get('x-admin-key');
+
   let payload = null;
   if (token) {
     try {
@@ -39,7 +43,7 @@ export async function middleware(request) {
     }
   }
 
-  const isAuthenticated = Boolean(payload && payload.id && payload.role === 'admin');
+  const isAuthenticated = Boolean((payload && payload.id && payload.role === 'admin') || apiKey);
   const isPublicPage = PUBLIC_PAGES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );

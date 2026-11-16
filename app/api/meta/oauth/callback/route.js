@@ -128,8 +128,11 @@ export async function GET(request) {
 
           exchangedServerSide = true;
           settings.metaConfig = {
+            ...(settings.metaConfig?.toObject?.() || settings.metaConfig),
+            integrationMode: 'OAUTH',
             connected: true,
             appId,
+            appSecret: appSecret || settings.metaConfig?.appSecret || '',
             pageId,
             pageName,
             adAccountId: userAdAccountId,
@@ -138,6 +141,7 @@ export async function GET(request) {
             connectedPages,
             connectedAdAccounts,
             verifyToken: process.env.META_VERIFY_TOKEN || settings.metaConfig?.verifyToken || 'KISAN_META_WEBHOOK_VERIFY',
+            webhookUrl: settings.metaConfig?.webhookUrl || '',
             webhookSubscribed: true,
             autoSyncEnabled: true,
             zeroLossFallback: true,

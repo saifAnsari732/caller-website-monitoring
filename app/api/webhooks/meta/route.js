@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 import connectDB from '../../../../lib/db';
 import Lead from '../../../../lib/models/Lead';
 import User from '../../../../lib/models/User';
@@ -7,6 +8,7 @@ import { getOrInitSettings } from '../../../../lib/settings';
 import { purgeDashboardCache, purgeMetaCache } from '../../../../lib/cache';
 import { parseMetaLeadItem, sanitizePhone } from '../../../../lib/metaLeadParser';
 import { analyzeLeadQuality } from '../../../../lib/metaLeadQuality';
+import { ingestLead, journalLeadToDisk } from '../../../../lib/leadIngestionEngine';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +37,9 @@ export async function GET(request) {
       endpoint: '/api/webhooks/meta',
       source: source || 'facebook_instagram',
       verifyTokenConfigured: true,
+      integrationMode: settings.metaConfig?.integrationMode || 'OAUTH',
+      pageId: settings.metaConfig?.pageId || process.env.META_PAGE_ID,
+      pageName: settings.metaConfig?.pageName || process.env.META_PAGE_NAME,
       concurrencyProtection: 'ATOMIC_SEQUENCE_MUTEX',
       message: 'Kisan Choice Meta Lead Ads Webhook Receiver is online (High-Throughput Zero-Loss Engine).'
     });
@@ -43,55 +48,46 @@ export async function GET(request) {
   }
 }
 
-async function pickCallerAtomic(activeCallers, formConfig, globalStrategy) {
-  if (!activeCallers || activeCallers.length === 0) return null;
-
-  if (formConfig?.distributionRule === 'DIRECT_CALLER' && formConfig?.assignedCallerId) {
-    const direct = activeCallers.find(c => c._id.toString() === formConfig.assignedCallerId.toString());
-    if (direct) return direct;
-  }
-
-  let pool = activeCallers;
-  if (formConfig?.assignedTeam) {
-    const teamMembers = activeCallers.filter(
-      c => (c.team || '').toLowerCase() === formConfig.assignedTeam.toLowerCase()
-    );
-    if (teamMembers.length > 0) pool = teamMembers;
-  }
-
-  const rule = formConfig?.distributionRule || globalStrategy || 'ROUND_ROBIN';
-
-  if (rule === 'LOAD_BALANCED') {
-    const counts = await Promise.all(
-      pool.map(async (c) => ({
-        caller: c,
-        open: await Lead.countDocuments({
-          assigned_to: c._id,
-          status: { $in: ['Fresh Lead', 'Assigned', 'In-Progress', 'Follow Up', 'Callback'] }
-        })
-      }))
-    );
-    counts.sort((a, b) => a.open - b.open);
-    return counts[0].caller;
-  }
-
-  // ATOMIC ROUND-ROBIN: Increment persistent counter to guarantee NO collisions during concurrent bursts
-  const poolKey = `rr_${formConfig?.formId || formConfig?.assignedTeam || 'global'}`;
-  const counter = await Counter.findOneAndUpdate(
-    { _id: poolKey },
-    { $inc: { seq: 1 } },
-    { returnDocument: 'after', upsert: true }
-  );
-  const callerIdx = Math.abs((counter?.seq || 0) % pool.length);
-  return pool[callerIdx];
-}
-
 export async function POST(request) {
   const startTime = Date.now();
+  let rawBody = '';
   try {
+    // 1. MUST read raw body FIRST to guarantee zero payload loss if DB/network throws
+    rawBody = await request.text().catch(() => '');
+    let body = {};
+    try {
+      body = rawBody ? JSON.parse(rawBody) : {};
+    } catch {
+      return NextResponse.json({ error: 'Malformed JSON payload' }, { status: 400 });
+    }
+
     await connectDB();
-    const body = await request.json().catch(() => ({}));
     const settings = await getOrInitSettings();
+
+    const appSecret = settings.metaConfig?.appSecret || process.env.META_APP_SECRET || '';
+    const sig256 = request.headers.get('x-hub-signature-256');
+    const isManualTest = request.headers.get('x-crm-test') === 'true' || body.__is_test === true;
+
+    // Verify Meta HMAC SHA-256 signature if header is present
+    if (sig256 && appSecret && !isManualTest) {
+      try {
+        const cleanSig = sig256.trim().toLowerCase();
+        const expectedHash = crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
+        const expectedSig = `sha256=${expectedHash}`.toLowerCase();
+        if (cleanSig.length === expectedSig.length) {
+          const match = crypto.timingSafeEqual(Buffer.from(cleanSig), Buffer.from(expectedSig));
+          if (!match) {
+            console.warn('[Meta Webhook] X-Hub-Signature-256 mismatch');
+            return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 403 });
+          }
+        } else {
+          return NextResponse.json({ error: 'Invalid webhook signature length' }, { status: 403 });
+        }
+      } catch (sigErr) {
+        console.warn('[Meta Webhook] Signature check exception:', sigErr.message);
+      }
+    }
+
     const token =
       settings.metaConfig?.accessToken ||
       process.env.META_PAGE_ACCESS_TOKEN ||
@@ -107,7 +103,7 @@ export async function POST(request) {
         for (const change of (entry.changes || [])) {
           if (change?.value) {
             incomingItems.push({
-              pageId: String(entry.id || ''),
+              pageId: String(entry.id || change.value.page_id || ''),
               formId: String(change.value.form_id || ''),
               metaLeadId: String(change.value.leadgen_id || ''),
               field_data: change.value.field_data || null,
@@ -132,6 +128,7 @@ export async function POST(request) {
         business_type: (body.business_type || '').trim(),
         product_interest: (body.product_interest || body.subject || '').trim(),
         campaign_name: (body.campaign_name || '').trim(),
+        field_data: body.field_data || null,
         notes: body.notes || ''
       });
     }
@@ -178,13 +175,17 @@ export async function POST(request) {
         : null;
       const activeToken = pageMatch?.accessToken || token;
 
-      // Fetch from Meta Graph API if leadgen_id exists and token is active
+      // Fetch from Meta Graph API if leadgen_id exists (numeric real ID) and token is active
       let parsedFromGraph = false;
-      if (extracted.metaLeadId && activeToken && activeToken.length > 15) {
+      const isRealMetaId = extracted.metaLeadId && /^\d+$/.test(extracted.metaLeadId);
+      if (isRealMetaId && activeToken && activeToken.length > 15) {
         try {
           const leadRes = await fetch(
             `https://graph.facebook.com/v21.0/${extracted.metaLeadId}?fields=id,created_time,ad_name,campaign_name,form_id,field_data&access_token=${encodeURIComponent(activeToken.trim())}`,
-            { cache: 'no-store' }
+            {
+              cache: 'no-store',
+              signal: AbortSignal.timeout(3500)
+            }
           );
           const leadData = await leadRes.json();
           if (leadData && !leadData.error) {
@@ -193,7 +194,10 @@ export async function POST(request) {
               try {
                 const fnRes = await fetch(
                   `https://graph.facebook.com/v21.0/${extracted.formId}?fields=name&access_token=${encodeURIComponent(activeToken.trim())}`,
-                  { cache: 'no-store' }
+                  {
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(2000)
+                  }
                 );
                 const fnData = await fnRes.json();
                 if (fnData?.name) formName = fnData.name;
@@ -220,7 +224,7 @@ export async function POST(request) {
         }
       }
 
-      // Fallback: parse raw field_data if provided directly in webhook
+      // Fallback: parse raw field_data if provided directly in webhook or testing payload
       if (!parsedFromGraph && Array.isArray(rawItem.field_data)) {
         const parsed = parseMetaLeadItem(
           { id: extracted.metaLeadId, field_data: rawItem.field_data, campaign_name: rawItem.campaign_name },
@@ -239,103 +243,31 @@ export async function POST(request) {
         extracted.notes = parsed.notes || extracted.notes;
       }
 
-      const cleanPhone = sanitizePhone(extracted.mobile);
-      const rawMobile = String(extracted.mobile || '').trim();
-
-      if (!cleanPhone && !rawMobile && !extracted.metaLeadId) {
-        whLogs.push({
-          id: `wh-err-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          timestamp: new Date(),
-          formId: extracted.formId || 'Direct',
-          status: 'REJECTED_NO_CONTACT',
-          latencyMs: Date.now() - startTime
-        });
-        continue;
-      }
-
-      // 3. ATOMIC DEDUPLICATION PROTECTION (Prevent Duplicate Ingestion)
-      let existing = null;
-      if (extracted.metaLeadId) {
-        existing = await Lead.findOne({
-          $or: [
-            { meta_lead_id: extracted.metaLeadId },
-            { notes: { $regex: extracted.metaLeadId } }
-          ]
-        });
-      }
-      if (!existing && cleanPhone) {
-        existing = await Lead.findOne({ mobile: cleanPhone });
-      }
-
-      if (existing) {
-        results.push({
-          lead_id: existing.lead_id,
-          name: existing.name,
-          mobile: existing.mobile,
-          status: 'DUPLICATE_SKIPPED',
-          message: 'Lead already ingested in CRM.'
-        });
-        continue;
-      }
-
-      // 4. ZERO-LOSS PHONE FALLBACK & TAGGING
-      const zeroLossTriggered = !cleanPhone;
-      const savedMobile = cleanPhone || rawMobile.substring(0, 20) || `META-${extracted.metaLeadId}`;
-      const tags = zeroLossTriggered ? ['Urgent'] : [];
       const resolvedSource = 'Facebook Meta Lead Ads';
       const resolvedCampaign =
         extracted.campaign_name || matchedForm?.campaignName || matchedForm?.formName || 'Meta Ads';
 
-      const qualityResult = analyzeLeadQuality({
-        name: extracted.name,
-        mobile: savedMobile,
-        email: extracted.email,
-        city: extracted.city,
-        state: extracted.state,
-        business_type: extracted.business_type,
-        product_interest: extracted.product_interest
-      });
-
-      if (qualityResult.tier === 'High Intent (VIP)') tags.push('High Intent');
-      if (qualityResult.isSpam) tags.push('Suspect Spam');
-
-      const priority = qualityResult.score >= 80 ? 'VIP' : (qualityResult.score >= 60 ? 'High' : 'Normal');
-
-      // 5. ATOMIC TELECALLER ASSIGNMENT (Zero Collision)
-      const chosenCaller = await pickCallerAtomic(
-        activeCallers,
-        matchedForm,
-        settings.distributionStrategy
-      );
-
-      // 6. CREATE LEAD WITH GUARANTEED UNIQUE SEQUENCE ID
-      const newLead = await Lead.create({
+      const ingestionResult = await ingestLead({
         name: extracted.name || `Meta Lead ${extracted.metaLeadId || ''}`.trim(),
-        mobile: savedMobile,
+        mobile: extracted.mobile,
         email: extracted.email,
         city: extracted.city,
         state: extracted.state,
         business_type: extracted.business_type,
         product_interest: extracted.product_interest,
-        join_as: extracted.join_as || extracted.business_type || '',
-        start_timeline: extracted.start_timeline || extracted.product_interest || '',
+        join_as: extracted.join_as,
+        start_timeline: extracted.start_timeline,
         meta_lead_id: extracted.metaLeadId,
-        meta_form_id: extracted.formId,
-        lead_source: resolvedSource,
+        formId: extracted.formId,
         campaign_name: resolvedCampaign,
-        status: chosenCaller ? 'Assigned' : 'Fresh Inquiry',
-        lead_status: 'In-Progress',
-        priority,
-        assigned_to: chosenCaller ? chosenCaller._id : null,
-        assigned_at: chosenCaller ? new Date() : null,
-        tags,
-        notes: extracted.notes || (zeroLossTriggered
-          ? `[URGENT] Unformatted Phone (${rawMobile}) saved via Zero-Loss Fallback. Intent Score: ${qualityResult.score}/100.`
-          : `Captured via ${resolvedSource} Webhook • Quality=${qualityResult.tier} (${qualityResult.score}/100)${resolvedCampaign ? ` • Campaign="${resolvedCampaign}"` : ''}`),
-        ...(extracted.createdTime ? { createdAt: extracted.createdTime } : {})
+        lead_source: resolvedSource,
+        notes: extracted.notes
+      }, {
+        source: resolvedSource,
+        defaultCampaign: resolvedCampaign
       });
 
-      // Update Form Stats
+      // Update Form Stats in SystemSetting
       if (matchedForm) {
         const formIdx = (settings.metaForms || []).findIndex(f => f.formId === matchedForm.formId);
         if (formIdx >= 0) {
@@ -345,30 +277,34 @@ export async function POST(request) {
         }
       }
 
-      // Append to Delivery Log
       const latencyMs = Date.now() - startTime;
       whLogs.push({
         id: `wh-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         timestamp: new Date(),
         formId: extracted.formId || 'Direct',
-        leadId: newLead.lead_id,
-        leadName: newLead.name,
-        leadMobile: newLead.mobile,
-        qualityScore: qualityResult.score,
-        qualityTier: qualityResult.tier,
-        status: 'INGESTED_200_OK',
-        assignedTo: chosenCaller ? chosenCaller.name : 'Unassigned Pool',
+        leadId: ingestionResult.lead_id || ingestionResult.lead?.lead_id,
+        leadName: ingestionResult.name || ingestionResult.lead?.name,
+        leadMobile: ingestionResult.mobile || ingestionResult.lead?.mobile,
+        status: ingestionResult.status || (ingestionResult.action === 'DUPLICATE_UPDATED' ? 'DUPLICATE_UPDATED' : 'INGESTED_200_OK'),
+        assignedTo: ingestionResult.assigned_to || 'Unassigned',
         latencyMs
       });
 
       results.push({
-        lead_id: newLead.lead_id,
-        name: newLead.name,
-        mobile: newLead.mobile,
-        status: 'INGESTED',
-        assignedTo: chosenCaller ? chosenCaller.name : 'Unassigned',
-        qualityScore: qualityResult.score,
-        zeroLossTriggered
+        lead_id: ingestionResult.lead_id || ingestionResult.lead?.lead_id,
+        name: ingestionResult.name || ingestionResult.lead?.name,
+        mobile: ingestionResult.mobile || ingestionResult.lead?.mobile,
+        email: ingestionResult.lead?.email || extracted.email,
+        city: ingestionResult.lead?.city || extracted.city,
+        business_type: ingestionResult.lead?.business_type || extracted.business_type,
+        product_interest: ingestionResult.lead?.product_interest || extracted.product_interest,
+        campaign_name: resolvedCampaign,
+        meta_lead_id: extracted.metaLeadId,
+        status: ingestionResult.action === 'CREATED' ? 'INGESTED' : (ingestionResult.action === 'DUPLICATE_UPDATED' ? 'DUPLICATE_UPDATED' : ingestionResult.status),
+        action: ingestionResult.action,
+        isRepeat: Boolean(ingestionResult.isRepeat),
+        submission_count: ingestionResult.submission_count || 1,
+        assignedTo: ingestionResult.assigned_to || 'Unassigned'
       });
     }
 
@@ -386,10 +322,19 @@ export async function POST(request) {
       processedCount: results.length,
       ingestedCount: results.filter(r => r.status === 'INGESTED').length,
       results,
+      lead: results[0] || null,
       latencyMs: Date.now() - startTime
     });
   } catch (err) {
     console.error('[Meta Webhook Fatal Exception]:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    // Durable Disk Journaling Fallback (Zero Lead Loss Guarantee for Meta Webhooks)
+    const dlq = journalLeadToDisk('Facebook Meta Lead Ads', rawBody, err.message);
+    return NextResponse.json({
+      success: true,
+      status: 'JOURNALED_DLQ',
+      message: 'Payload safely preserved in durable disk queue for auto-recovery',
+      queueId: dlq.queueId,
+      latencyMs: Date.now() - startTime
+    }, { status: 200 });
   }
 }
