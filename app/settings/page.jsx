@@ -93,13 +93,13 @@ export default function SettingsPage() {
   // Test Lead Webhook Sender State
   const [testLeadModalOpen, setTestLeadModalOpen] = useState(false);
   const [testLeadFormId, setTestLeadFormId] = useState('');
-  const [testLeadName, setTestLeadName] = useState('Vikramaditya Verma');
-  const [testLeadPhone, setTestLeadPhone] = useState('9876543299');
-  const [testLeadEmail, setTestLeadEmail] = useState('vikram.verma@example.com');
-  const [testLeadCity, setTestLeadCity] = useState('Varanasi');
-  const [testLeadState, setTestLeadState] = useState('Uttar Pradesh');
-  const [testLeadBusiness, setTestLeadBusiness] = useState('Exclusive Dealership / Distributor');
-  const [testLeadProduct, setTestLeadProduct] = useState('Mustard Oil (15L Tin) Bulk Dealership');
+  const [testLeadName, setTestLeadName] = useState('');
+  const [testLeadPhone, setTestLeadPhone] = useState('');
+  const [testLeadEmail, setTestLeadEmail] = useState('');
+  const [testLeadCity, setTestLeadCity] = useState('');
+  const [testLeadState, setTestLeadState] = useState('');
+  const [testLeadBusiness, setTestLeadBusiness] = useState('');
+  const [testLeadProduct, setTestLeadProduct] = useState('');
   const [sendingTestLead, setSendingTestLead] = useState(false);
   const [testLeadResult, setTestLeadResult] = useState(null);
 
@@ -2317,7 +2317,7 @@ export default function SettingsPage() {
                         type="text"
                         value={testLeadName}
                         onChange={(e) => setTestLeadName(e.target.value)}
-                        placeholder="Vikramaditya Verma"
+                        placeholder="e.g. Ramesh Kumar"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
                         required
                       />
@@ -2329,7 +2329,7 @@ export default function SettingsPage() {
                         type="tel"
                         value={testLeadPhone}
                         onChange={(e) => setTestLeadPhone(e.target.value)}
-                        placeholder="9876543299"
+                        placeholder="e.g. 9876543210"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
                         required
                       />
@@ -2343,7 +2343,7 @@ export default function SettingsPage() {
                         type="email"
                         value={testLeadEmail}
                         onChange={(e) => setTestLeadEmail(e.target.value)}
-                        placeholder="vikram.verma@example.com"
+                        placeholder="e.g. ramesh@example.com"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
                       />
                     </div>
@@ -2354,7 +2354,7 @@ export default function SettingsPage() {
                         type="text"
                         value={testLeadCity}
                         onChange={(e) => setTestLeadCity(e.target.value)}
-                        placeholder="Varanasi"
+                        placeholder="e.g. Varanasi"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
                       />
                     </div>
@@ -2362,23 +2362,23 @@ export default function SettingsPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Business Type (Custom Hindi Answer)</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Business Type (Answer)</label>
                       <input
                         type="text"
                         value={testLeadBusiness}
                         onChange={(e) => setTestLeadBusiness(e.target.value)}
-                        placeholder="डिस्ट्रीब्यूटर (Distributor)"
+                        placeholder="e.g. Distributor / Trader"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Product Requirement (Custom Answer)</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Product Requirement (Answer)</label>
                       <input
                         type="text"
                         value={testLeadProduct}
                         onChange={(e) => setTestLeadProduct(e.target.value)}
-                        placeholder="Mustard Oil (15L Tin) Bulk Dealership"
+                        placeholder="e.g. Dealership Inquiry"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
                       />
                     </div>
