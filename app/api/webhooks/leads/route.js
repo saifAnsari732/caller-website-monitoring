@@ -55,10 +55,10 @@ export async function POST(request) {
 
     // Optional secret token verification
     const secretHeader = request.headers.get('x-lead-secret') || request.headers.get('x-api-key') || request.headers.get('x-webhook-secret');
-    if (secretHeader && secretHeader !== 'LEAD_WEBHOOK_SECRET_2026' && secretHeader !== 'CRM_TEST_SECRET') {
+    if (secretHeader) {
       const settings = await getOrInitSettings().catch(() => null);
-      const expectedToken = settings?.websiteWebhookConfig?.secretToken || 'LEAD_WEBHOOK_SECRET_2026';
-      if (secretHeader !== expectedToken) {
+      const expectedToken = settings?.websiteWebhookConfig?.secretToken || process.env.LEAD_WEBHOOK_SECRET || '';
+      if (expectedToken && secretHeader !== expectedToken) {
         return NextResponse.json({ error: 'Unauthorized: Invalid lead webhook secret' }, { status: 401 });
       }
     }

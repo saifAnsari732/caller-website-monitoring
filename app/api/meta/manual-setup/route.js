@@ -417,15 +417,19 @@ export async function POST(request) {
         campaignName
       } = body;
 
+      if (!prospectName || !mobileNumber) {
+        return NextResponse.json({ error: 'Prospect Name and Mobile Number are required.' }, { status: 400 });
+      }
+
       const matchedForm = (settings.metaForms || []).find(
         f => String(f.formId) === String(formId)
       ) || settings.metaForms?.[0] || {
-        formId: '1768141694308234',
-        formName: 'Mirzapur 1 =9/2026, 16:00',
+        formId: formId || '',
+        formName: formName || 'Meta Ads Form',
         campaignName: 'Facebook Meta Lead Ads'
       };
 
-      const resolvedFormId = String(formId || matchedForm.formId || '1768141694308234');
+      const resolvedFormId = String(formId || matchedForm.formId || '');
       const resolvedFormName = formName || matchedForm.formName || 'Meta Ads Form';
       const resolvedCampaign = campaignName || matchedForm.campaignName || resolvedFormName;
 
@@ -435,16 +439,14 @@ export async function POST(request) {
 
       // Realistic Meta Lead Ads field_data structure (identical to Meta Graph API response)
       const fieldData = [
-        { name: 'full_name', values: [prospectName || 'Vikramaditya Verma'] },
-        { name: 'phone_number', values: [mobileNumber || `987${Math.floor(1000000 + Math.random() * 9000000)}`] },
-        { name: 'email', values: [emailAddress || 'vikram.verma@example.com'] },
-        { name: 'city', values: [cityName || 'Varanasi'] },
-        { name: 'state', values: [stateName || 'Uttar Pradesh'] },
-        { name: 'business_type', values: [businessType || 'Exclusive Dealership / Distributor'] },
-        { name: 'product_interest', values: [productInterest || 'Mustard Oil (15L Tin) Bulk Dealership'] },
-        { name: 'आप_किस_रूप_में_जुड़ना_चाहते_हैं?', values: [businessType || 'डिस्ट्रीब्यूटर (Distributor)'] },
-        { name: 'आप_कब_शुरू_करना_चाहेंगे?', values: [productInterest || 'तुरंत / 1 सप्ताह के अंदर (Immediately)'] },
-        { name: 'inbox_url', values: [`https://business.facebook.com/latest/inbox/all?page_id=${settings.metaConfig?.pageId || '933429549844450'}`] }
+        { name: 'full_name', values: [prospectName] },
+        { name: 'phone_number', values: [mobileNumber] },
+        { name: 'email', values: [emailAddress || ''] },
+        { name: 'city', values: [cityName || ''] },
+        { name: 'state', values: [stateName || ''] },
+        { name: 'business_type', values: [businessType || ''] },
+        { name: 'product_interest', values: [productInterest || ''] },
+        { name: 'inbox_url', values: [`https://business.facebook.com/latest/inbox/all?page_id=${settings.metaConfig?.pageId || ''}`] }
       ];
 
       // Standard Meta Lead Ads Webhook envelope
@@ -452,17 +454,17 @@ export async function POST(request) {
         object: 'page',
         entry: [
           {
-            id: settings.metaConfig?.pageId || '933429549844450',
+            id: settings.metaConfig?.pageId || '',
             time: testTimestamp,
             changes: [
               {
                 field: 'leadgen',
                 value: {
-                  ad_id: '12021590483920042',
+                  ad_id: '',
                   form_id: resolvedFormId,
                   leadgen_id: testLeadgenId,
                   created_time: testTimestamp,
-                  page_id: settings.metaConfig?.pageId || '933429549844450',
+                  page_id: settings.metaConfig?.pageId || '',
                   campaign_name: resolvedCampaign,
                   field_data: fieldData
                 }

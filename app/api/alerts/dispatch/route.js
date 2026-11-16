@@ -11,9 +11,9 @@ export const dynamic = 'force-dynamic';
 async function isAuthorized(request, settings) {
   const admin = await requireAdminApi(request);
   if (admin) return true;
-  const expectedSecret = settings?.neodoveConfig?.secretToken || 'NEODOVE_CRM_SECRET_2026';
+  const expectedSecret = settings?.neodoveConfig?.secretToken || process.env.NEODOVE_SECRET_TOKEN || '';
   const apiKey = request.headers.get('x-api-key') || request.headers.get('x-admin-key');
-  if (apiKey && (apiKey === expectedSecret || apiKey === 'CRM_TEST_SECRET')) {
+  if (expectedSecret && apiKey && apiKey === expectedSecret) {
     return true;
   }
   return false;

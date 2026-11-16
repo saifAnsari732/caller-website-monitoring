@@ -13,10 +13,10 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token') || searchParams.get('hub.verify_token');
 
-    const expectedToken = settings?.neodoveConfig?.secretToken || 'NEODOVE_CRM_SECRET_2026';
+    const expectedToken = settings?.neodoveConfig?.secretToken || process.env.NEODOVE_SECRET_TOKEN || '';
 
     if (token) {
-      if (token === expectedToken) {
+      if (expectedToken && token === expectedToken) {
         return NextResponse.json({
           verified: true,
           status: 'active',
@@ -64,10 +64,10 @@ export async function POST(request) {
 
     // Verify secret token if configured and header is sent
     const secretHeader = request.headers.get('x-neodove-secret') || request.headers.get('x-api-key');
-    if (secretHeader && secretHeader !== 'NEODOVE_CRM_SECRET_2026' && secretHeader !== 'CRM_TEST_SECRET') {
+    if (secretHeader) {
       const settings = await getOrInitSettings().catch(() => null);
-      const expectedToken = settings?.neodoveConfig?.secretToken || 'NEODOVE_CRM_SECRET_2026';
-      if (secretHeader !== expectedToken) {
+      const expectedToken = settings?.neodoveConfig?.secretToken || process.env.NEODOVE_SECRET_TOKEN || '';
+      if (expectedToken && secretHeader !== expectedToken) {
         return NextResponse.json({ error: 'Unauthorized: Invalid NeoDove secret header' }, { status: 401 });
       }
     }

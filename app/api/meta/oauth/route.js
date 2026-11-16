@@ -8,10 +8,10 @@ import { parseMetaLeadItem } from '../../../../lib/metaLeadParser';
 
 export const dynamic = 'force-dynamic';
 
-const DEFAULT_APP_ID = process.env.META_APP_ID || '1007200718473332';
-const DEFAULT_APP_SECRET = process.env.META_APP_SECRET || '3417199d662e081419c470b832d1a49a';
-const DEFAULT_PAGE_ID = process.env.META_PAGE_ID || '933429549844450';
-const DEFAULT_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID || 'act_1796071777698019';
+const DEFAULT_APP_ID = process.env.META_APP_ID || '';
+const DEFAULT_APP_SECRET = process.env.META_APP_SECRET || '';
+const DEFAULT_PAGE_ID = process.env.META_PAGE_ID || '';
+const DEFAULT_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID || '';
 const DEFAULT_PAGE_TOKEN = process.env.META_PAGE_ACCESS_TOKEN || '';
 const DEFAULT_USER_TOKEN = process.env.META_USER_ACCESS_TOKEN || '';
 
@@ -27,16 +27,17 @@ export async function GET(request) {
     await connectDB();
     const settings = await SystemSetting.findOne({ key: 'global' }).lean();
 
-    const configId = searchParams.get('config_id') || process.env.META_CONFIG_ID || settings?.metaConfig?.configId || '2583186895497299';
+    const activeAppId = DEFAULT_APP_ID || settings?.metaConfig?.appId || '';
+    const configId = searchParams.get('config_id') || process.env.META_CONFIG_ID || settings?.metaConfig?.configId || '';
     const responseType = 'code';
     let authUrl;
     if (configId) {
-      authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${DEFAULT_APP_ID}&redirect_uri=${encodeURIComponent(
+      authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${activeAppId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&config_id=${encodeURIComponent(configId)}&response_type=${responseType}&state=kisan_meta_oauth_${Date.now()}`;
     } else {
       const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_ads,leads_retrieval';
-      authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${DEFAULT_APP_ID}&redirect_uri=${encodeURIComponent(
+      authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${activeAppId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&scope=${encodeURIComponent(scopes)}&response_type=${responseType}&state=kisan_meta_oauth_${Date.now()}`;
     }

@@ -62,12 +62,22 @@ async function purgeAllDummyData() {
       {
         $set: {
           metaForms: updatedMetaForms,
-          'neodoveConfig.leadsCaptured': 0,
-          'neodoveConfig.leadsSyncedOut': 0,
-          'neodoveConfig.lastInboundAt': null,
-          'neodoveConfig.lastOutboundAt': null,
+          neodoveConfig: {
+            enabled: false,
+            webhookUrl: '',
+            apiKey: '',
+            secretToken: '',
+            autoSync: false,
+            syncLeadStages: false,
+            lastInboundAt: null,
+            lastOutboundAt: null,
+            leadsCaptured: 0,
+            leadsSyncedOut: 0
+          },
+          'websiteWebhookConfig.secretToken': '',
           'websiteWebhookConfig.leadsCaptured': 0,
-          'websiteWebhookConfig.lastLeadAt': null
+          'websiteWebhookConfig.lastLeadAt': null,
+          connectedIntegrations: []
         }
       }
     );
@@ -87,12 +97,22 @@ async function purgeAllDummyData() {
       {
         $set: {
           metaForms: updatedMetaForms,
-          'neodoveConfig.leadsCaptured': 0,
-          'neodoveConfig.leadsSyncedOut': 0,
-          'neodoveConfig.lastInboundAt': null,
-          'neodoveConfig.lastOutboundAt': null,
+          neodoveConfig: {
+            enabled: false,
+            webhookUrl: '',
+            apiKey: '',
+            secretToken: '',
+            autoSync: false,
+            syncLeadStages: false,
+            lastInboundAt: null,
+            lastOutboundAt: null,
+            leadsCaptured: 0,
+            leadsSyncedOut: 0
+          },
+          'websiteWebhookConfig.secretToken': '',
           'websiteWebhookConfig.leadsCaptured': 0,
-          'websiteWebhookConfig.lastLeadAt': null
+          'websiteWebhookConfig.lastLeadAt': null,
+          connectedIntegrations: []
         }
       }
     );

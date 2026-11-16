@@ -41,17 +41,17 @@ export async function GET(request) {
 
   try {
     await connectDB();
-    const appId = process.env.META_APP_ID || '1007200718473332';
-    const appSecret = process.env.META_APP_SECRET || '3417199d662e081419c470b832d1a49a';
-    const redirectUri = `${origin}/api/meta/oauth/callback`;
-
     let settings = await SystemSetting.findOne({ key: 'global' });
     if (!settings) settings = new SystemSetting({ key: 'global' });
 
+    const appId = process.env.META_APP_ID || settings.metaConfig?.appId || '';
+    const appSecret = process.env.META_APP_SECRET || settings.metaConfig?.appSecret || '';
+    const redirectUri = `${origin}/api/meta/oauth/callback`;
+
     let activeToken = settings.metaConfig?.accessToken || process.env.META_PAGE_ACCESS_TOKEN || '';
     let userToken = settings.metaConfig?.userAccessToken || process.env.META_USER_ACCESS_TOKEN || '';
-    let pageId = settings.metaConfig?.pageId || process.env.META_PAGE_ID || '933429549844450';
-    let pageName = settings.metaConfig?.pageName || process.env.META_PAGE_NAME || 'Kisan Choice';
+    let pageId = settings.metaConfig?.pageId || process.env.META_PAGE_ID || '';
+    let pageName = settings.metaConfig?.pageName || process.env.META_PAGE_NAME || '';
     let exchangedServerSide = false;
     let syncedFormsCount = settings.metaForms?.length || 0;
 

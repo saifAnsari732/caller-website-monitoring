@@ -76,13 +76,13 @@ export default function SettingsPage() {
 
   // Manual Setup State
   const [manualToken, setManualToken] = useState('');
-  const [manualAppId, setManualAppId] = useState('1007200718473332');
+  const [manualAppId, setManualAppId] = useState('');
   const [manualAppSecret, setManualAppSecret] = useState('');
-  const [manualPageId, setManualPageId] = useState('933429549844450');
-  const [manualPageName, setManualPageName] = useState('Kisan Choice');
-  const [manualAdAccountId, setManualAdAccountId] = useState('act_1796071777698019');
+  const [manualPageId, setManualPageId] = useState('');
+  const [manualPageName, setManualPageName] = useState('');
+  const [manualAdAccountId, setManualAdAccountId] = useState('');
   const [manualFormId, setManualFormId] = useState('');
-  const [manualVerifyToken, setManualVerifyToken] = useState('KISAN_META_WEBHOOK_VERIFY');
+  const [manualVerifyToken, setManualVerifyToken] = useState('');
   const [manualWebhookUrl, setManualWebhookUrl] = useState('');
   const [showManualToken, setShowManualToken] = useState(false);
   const [showManualSecret, setShowManualSecret] = useState(false);
@@ -136,7 +136,7 @@ export default function SettingsPage() {
     enabled: false,
     webhookUrl: '',
     apiKey: '',
-    secretToken: 'NEODOVE_CRM_SECRET_2026',
+    secretToken: '',
     autoSync: false,
     leadsCaptured: 0,
     leadsSyncedOut: 0
@@ -460,7 +460,7 @@ export default function SettingsPage() {
     setSendingTestLead(true);
     setTestLeadResult(null);
 
-    const activeFormId = testLeadFormId || status?.metaForms?.[0]?.formId || '1768141694308234';
+    const activeFormId = testLeadFormId || status?.metaForms?.[0]?.formId || '';
     const activeForm = (status?.metaForms || []).find(f => String(f.formId) === String(activeFormId));
 
     try {
@@ -470,7 +470,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           action: 'SEND_TEST_LEAD',
           formId: activeFormId,
-          formName: activeForm?.formName || 'Mirzapur 1 =9/2026, 16:00',
+          formName: activeForm?.formName || 'Meta Ads Form',
           prospectName: testLeadName,
           mobileNumber: testLeadPhone,
           emailAddress: testLeadEmail,
@@ -693,23 +693,21 @@ export default function SettingsPage() {
       object: 'page',
       entry: [
         {
-          id: status?.pageId || '933429549844450',
+          id: status?.pageId || '',
           time: Math.floor(Date.now() / 1000),
           changes: [
             {
               field: 'leadgen',
               value: {
-                ad_id: '12021590483920042',
-                form_id: simFormId || status?.metaForms?.[0]?.formId || '1768141694308234',
+                ad_id: '',
+                form_id: simFormId || status?.metaForms?.[0]?.formId || '',
                 leadgen_id: `SIM-${Date.now()}`,
                 created_time: Math.floor(Date.now() / 1000),
-                campaign_name: 'Sales - Mirzapur 1 -9/2026, 16:00',
+                campaign_name: status?.metaForms?.[0]?.campaignName || 'Meta Ads Campaign',
                 field_data: [
-                  { name: 'full_name', values: [simName || 'Vikramaditya Verma'] },
-                  { name: 'phone_number', values: [simMobile || '9876543299'] },
-                  { name: 'email', values: ['lead@kisanchoice.com'] },
-                  { name: 'city', values: ['Varanasi'] },
-                  { name: 'product_interest', values: [simProduct || 'Mustard Oil (15L Tin)'] }
+                  { name: 'full_name', values: [simName] },
+                  { name: 'phone_number', values: [simMobile] },
+                  { name: 'product_interest', values: [simProduct || ''] }
                 ]
               }
             }
@@ -804,11 +802,11 @@ export default function SettingsPage() {
                     Mode: {status?.integrationMode === 'MANUAL' ? 'Manual Setup' : 'OAuth 2.0'}
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                    Page ID: {status?.pageId || manualPageId || '933429549844450'}
+                    Page ID: {status?.pageId || manualPageId || 'Not Configured'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 font-medium">
-                  Ad Account: <strong className="text-slate-700">{status?.adAccountId || manualAdAccountId} (Kisan Kumar)</strong> • App ID: <strong className="text-slate-700">{status?.appId || manualAppId}</strong>
+                  Ad Account: <strong className="text-slate-700">{status?.adAccountId || manualAdAccountId || 'Not Configured'}</strong> • App ID: <strong className="text-slate-700">{status?.appId || manualAppId || 'Not Configured'}</strong>
                 </p>
               </div>
             </div>
@@ -991,14 +989,14 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Target Facebook Page</span>
-                    <span className="text-base font-bold text-slate-900 block">{status?.pageName || 'Kisan Choice'}</span>
-                    <span className="text-xs text-slate-500 font-mono">Page ID: {status?.pageId || '933429549844450'}</span>
+                    <span className="text-base font-bold text-slate-900 block">{status?.pageName || 'Not Connected'}</span>
+                    <span className="text-xs text-slate-500 font-mono">Page ID: {status?.pageId || 'Not Configured'}</span>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Facebook App ID &amp; Config</span>
-                    <span className="text-base font-bold text-slate-900 block font-mono">{status?.appId || '1007200718473332'}</span>
-                    <span className="text-xs text-slate-500">Config ID: 2583186895497299</span>
+                    <span className="text-base font-bold text-slate-900 block font-mono">{status?.appId || 'Not Configured'}</span>
+                    <span className="text-xs text-slate-500">{status?.configId ? `Config ID: ${status.configId}` : ''}</span>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
@@ -1149,7 +1147,7 @@ export default function SettingsPage() {
                         type="text"
                         value={manualPageId}
                         onChange={(e) => setManualPageId(e.target.value)}
-                        placeholder="933429549844450"
+                        placeholder="e.g. 933429549844450"
                         className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                         required
                       />
@@ -1163,7 +1161,7 @@ export default function SettingsPage() {
                         type="text"
                         value={manualPageName}
                         onChange={(e) => setManualPageName(e.target.value)}
-                        placeholder="Kisan Choice"
+                        placeholder="e.g. Kisan Choice"
                         className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                       />
                     </div>
@@ -1176,7 +1174,7 @@ export default function SettingsPage() {
                         type="text"
                         value={manualAdAccountId}
                         onChange={(e) => setManualAdAccountId(e.target.value)}
-                        placeholder="act_1796071777698019"
+                        placeholder="e.g. act_1796071777698019"
                         className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                       />
                     </div>

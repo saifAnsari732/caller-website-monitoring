@@ -12,9 +12,9 @@ export const dynamic = 'force-dynamic';
 async function isAuthorized(request, settings) {
   const admin = await requireAdminApi(request);
   if (admin) return true;
-  const expectedSecret = settings?.neodoveConfig?.secretToken || 'NEODOVE_CRM_SECRET_2026';
+  const expectedSecret = settings?.neodoveConfig?.secretToken || process.env.NEODOVE_SECRET_TOKEN || '';
   const apiKey = request.headers.get('x-api-key') || request.headers.get('x-admin-key') || request.headers.get('x-neodove-secret');
-  if (apiKey && (apiKey === expectedSecret || apiKey === 'CRM_TEST_SECRET')) {
+  if (expectedSecret && apiKey && apiKey === expectedSecret) {
     return true;
   }
   return false;
@@ -40,7 +40,7 @@ export async function GET(request) {
         enabled: neodove.enabled || false,
         webhookUrl: neodove.webhookUrl || '',
         apiKeyConfigured: Boolean(neodove.apiKey),
-        secretToken: neodove.secretToken || 'NEODOVE_CRM_SECRET_2026',
+        secretToken: neodove.secretToken || '',
         autoSync: neodove.autoSync || false,
         syncLeadStages: neodove.syncLeadStages !== false,
         lastInboundAt: neodove.lastInboundAt || null,
@@ -92,35 +92,18 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized: Administrator authentication required' }, { status: 401 });
     }
     const body = await request.json();
-    const { leadId, testLead } = body;
+    const { leadId } = body;
 
     let leadToSync = null;
     if (leadId) {
       leadToSync = await Lead.findById(leadId).populate('assigned_to', 'name');
-    } else if (testLead) {
-      leadToSync = {
-        lead_id: `L-TEST-${Date.now().toString().slice(-4)}`,
-        name: testLead.name || 'NeoDove Mirror Test Lead',
-        mobile: testLead.mobile || '9876543210',
-        email: testLead.email || 'test@neodove.com',
-        city: testLead.city || 'Indore',
-        state: testLead.state || 'Madhya Pradesh',
-        campaign_name: 'NeoDove Mirror Sync Test',
-        lead_source: 'Kisan Choice CRM',
-        deal_amount: 15000,
-        status: 'Interested',
-        sub_disposition: 'Distributor Inquiry',
-        notes: 'Testing outbound webhook synchronization with NeoDove CRM',
-        assigned_to: { name: 'Active Telecaller' },
-        createdAt: new Date()
-      };
     } else {
-      // Pick latest lead
+      // Pick latest real lead if available
       leadToSync = await Lead.findOne({ lead_source: { $ne: 'NeoDove' } }).sort({ createdAt: -1 }).populate('assigned_to', 'name');
     }
 
     if (!leadToSync) {
-      return NextResponse.json({ error: 'No lead available to sync' }, { status: 404 });
+      return NextResponse.json({ error: 'No lead available to sync. Provide a valid leadId.' }, { status: 404 });
     }
 
     const syncResult = await syncLeadToNeoDove(leadToSync, settings);
