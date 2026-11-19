@@ -364,7 +364,7 @@ export default function MetaLeadsPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-slate-800 tabular-nums">+91 {lead.mobile}</span>
                             <a
-                              href={`https://wa.me/91${String(lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${lead.name} ji, KisanConnect Meta Inquiry regarding ${lead.productInterest}.`)}`}
+                              href={`https://wa.me/91${String(lead.mobile || '').replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Namaste ${lead.name} ji, KisanConnect Meta Inquiry regarding ${lead.productInterest}.`)}`}
                               target="_blank"
                               rel="noreferrer"
                               className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors cursor-pointer"

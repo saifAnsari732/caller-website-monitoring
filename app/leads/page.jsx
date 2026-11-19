@@ -1158,7 +1158,7 @@ export default function LeadsPage() {
                                 {activeMenuId === lead._id && (
                                   <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-30 text-xs">
                                     <a
-                                      href={`https://wa.me/91${String(lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${lead.name} ji, regarding your inquiry.`)}`}
+                                      href={`https://wa.me/91${String(lead.mobile || '').replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Namaste ${lead.name} ji, regarding your inquiry.`)}`}
                                       target="_blank"
                                       rel="noreferrer"
                                       className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 font-medium"
@@ -1886,7 +1886,7 @@ export default function LeadsPage() {
                       </button>
 
                       <a
-                        href={`https://wa.me/91${String(inspectorData.lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${inspectorData.lead.name} ji, regarding your Kisan Choice Mustard Oil inquiry.`)}`}
+                        href={`https://wa.me/91${String(inspectorData.lead.mobile || '').replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Namaste ${inspectorData.lead.name} ji, regarding your Kisan Choice Mustard Oil inquiry.`)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"

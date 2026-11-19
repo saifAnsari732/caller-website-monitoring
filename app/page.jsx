@@ -1384,7 +1384,7 @@ export default function Dashboard() {
                                     {activeMenuId === leadId && (
                                       <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-30 text-xs">
                                         <a
-                                          href={`https://wa.me/91${String(lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${lead.name} ji, regarding your inquiry.`)}`}
+                                          href={`https://wa.me/91${String(lead.mobile || '').replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Namaste ${lead.name} ji, regarding your inquiry.`)}`}
                                           target="_blank"
                                           rel="noreferrer"
                                           className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 font-medium"
@@ -1983,7 +1983,7 @@ export default function Dashboard() {
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 <div className="flex items-center gap-3">
                   <a
-                    href={`https://wa.me/91${String(inspectorData.lead.mobile).slice(-10)}?text=${encodeURIComponent(`Namaste ${inspectorData.lead.name} ji, regarding your inquiry.`)}`}
+                    href={`https://wa.me/91${String(inspectorData.lead.mobile || '').replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Namaste ${inspectorData.lead.name} ji, regarding your inquiry.`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-xs"

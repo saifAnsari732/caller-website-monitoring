@@ -717,7 +717,7 @@ export default function BrowserPage() {
                           <td className="py-3.5 px-4">
                             {l.phone ? (
                               <a
-                                href={`tel:${l.phone}`}
+                                href={`tel:${String(l.phone || '').replace(/[^\d+]/g, '')}`}
                                 className="inline-flex items-center gap-1.5 font-mono font-semibold text-slate-800 hover:text-blue-600 tabular-nums"
                               >
                                 <Phone size={12} className="text-slate-400" />
