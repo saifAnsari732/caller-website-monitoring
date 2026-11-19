@@ -38,10 +38,10 @@ function LoginContent() {
 
   const validateField = (name, val) => {
     if (name === 'identifier') {
-      if (!val.trim()) return 'Enter your Administrator mobile, email, or Admin ID.';
+      if (!val.trim()) return 'Enter your mobile, email, or employee ID.';
     }
     if (name === 'password') {
-      if (!val) return 'Enter your Administrator password.';
+      if (!val) return 'Enter your password.';
     }
     return '';
   };
@@ -196,6 +196,59 @@ function LoginContent() {
                 <span>{error}</span>
               </div>
             )}
+
+            {/* 1-Click Role Testing & Demo Sign-in */}
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/90 space-y-2">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                Quick 1-Click Role Sign-In
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIdentifier('9876543210');
+                    setPassword('admin123');
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-colors cursor-pointer shadow-2xs group"
+                >
+                  <span className="text-xs font-bold text-slate-900 group-hover:text-blue-700 block">👑 Admin</span>
+                  <span className="text-[10px] text-slate-400 block truncate">Sanjay Gupta (Full Access)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIdentifier('9876543212');
+                    setPassword('admin123');
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-purple-50 border border-slate-200 hover:border-purple-300 text-left transition-colors cursor-pointer shadow-2xs group"
+                >
+                  <span className="text-xs font-bold text-purple-900 group-hover:text-purple-700 block">🛡️ TL (NCR Team)</span>
+                  <span className="text-[10px] text-slate-400 block truncate">Vikram Malhotra</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIdentifier('9876543215');
+                    setPassword('admin123');
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-purple-50 border border-slate-200 hover:border-purple-300 text-left transition-colors cursor-pointer shadow-2xs group"
+                >
+                  <span className="text-xs font-bold text-purple-900 group-hover:text-purple-700 block">🛡️ TL (Mumbai Team)</span>
+                  <span className="text-[10px] text-slate-400 block truncate">Neha Kapoor</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIdentifier('9876543211');
+                    setPassword('admin123');
+                  }}
+                  className="p-2 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-left transition-colors cursor-pointer shadow-2xs group"
+                >
+                  <span className="text-xs font-bold text-emerald-900 group-hover:text-emerald-700 block">📞 Telecaller</span>
+                  <span className="text-[10px] text-slate-400 block truncate">Amit Sharma</span>
+                </button>
+              </div>
+            </div>
 
             <form method="post" onSubmit={handleSubmit} noValidate className="space-y-4">
               <div>

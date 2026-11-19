@@ -8,7 +8,7 @@ import LeadActivity from '../../../lib/models/LeadActivity';
 import SystemSetting from '../../../lib/models/SystemSetting';
 import Counter from '../../../lib/models/Counter';
 import { purgeDashboardCache, getLeadFilterForAdmin } from '../../../lib/cache';
-import { requireAdminApi } from '../../../lib/auth';
+import { requireAdminApi, requireUserApi } from '../../../lib/auth';
 import { routeLead } from '../../../lib/leadRouter';
 import { normalizeStage } from '../../../lib/leadDispositions';
 import { dispatchChannelAlerts } from '../../../lib/channelAlerts';
@@ -20,12 +20,29 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
-    const adminPayload = await requireAdminApi(request);
-    if (!adminPayload) {
-      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    const userPayload = await requireUserApi(request);
+    if (!userPayload) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
     await connectDB();
-    const leadFilter = getLeadFilterForAdmin(adminPayload.id);
+
+    let leadFilter = {};
+    if (userPayload.role === 'telecaller') {
+      leadFilter = { assigned_to: userPayload.id };
+    } else if (userPayload.role === 'team_leader' || userPayload.role === 'manager') {
+      const teamMembers = await User.find({
+        $or: [{ team_leader_id: userPayload.id }, { _id: userPayload.id }]
+      }).select('_id');
+      const memberIds = teamMembers.map(m => m._id);
+      leadFilter = {
+        $or: [
+          { assigned_team_leader: userPayload.id },
+          { assigned_to: { $in: memberIds } }
+        ]
+      };
+    } else if (userPayload.role === 'admin') {
+      leadFilter = getLeadFilterForAdmin(userPayload.id);
+    }
     const { searchParams } = new URL(request.url);
     const detailId = searchParams.get('detailId') || '';
 

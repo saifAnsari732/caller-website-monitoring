@@ -36,6 +36,7 @@ const NAVIGATION_SECTIONS = [
     label: 'Workspace',
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+      { name: 'Team Leader Portal', href: '/team-leader', icon: Award },
       { name: 'Contacts & Leads', href: '/leads', icon: Users },
       { name: 'Call Logs', href: '/calls', icon: PhoneCall },
       { name: 'Follow-ups', href: '/followups', icon: CalendarClock },
@@ -229,69 +230,71 @@ export default function Sidebar() {
           </div>
         ))}
 
-        {/* Administration & Security Section */}
-        <div className="pt-2 border-t border-slate-200/80 space-y-1">
-          {!isCollapsedView ? (
-            <button
-              type="button"
-              onClick={() => setAdminOpen((prev) => !prev)}
-              aria-expanded={adminOpen}
-              className="w-full flex items-center justify-between px-3 pt-1 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-            >
-              <span>Administration</span>
-              <ChevronDown
-                size={14}
-                strokeWidth={2}
-                aria-hidden="true"
-                className={`transition-transform duration-150 ${adminOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-          ) : (
-            <div className="h-px bg-slate-200/80 my-1 mx-1" />
-          )}
+        {/* Administration & Security Section (Admin Only) */}
+        {user?.role === 'admin' && (
+          <div className="pt-2 border-t border-slate-200/80 space-y-1">
+            {!isCollapsedView ? (
+              <button
+                type="button"
+                onClick={() => setAdminOpen((prev) => !prev)}
+                aria-expanded={adminOpen}
+                className="w-full flex items-center justify-between px-3 pt-1 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              >
+                <span>Administration</span>
+                <ChevronDown
+                  size={14}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                  className={`transition-transform duration-150 ${adminOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+            ) : (
+              <div className="h-px bg-slate-200/80 my-1 mx-1" />
+            )}
 
-          {(adminOpen || isCollapsedView) &&
-            ADMIN_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            {(adminOpen || isCollapsedView) &&
+              ADMIN_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  title={isCollapsedView ? item.name : undefined}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={`relative flex items-center ${
-                    isCollapsedView
-                      ? 'justify-center p-2.5'
-                      : 'gap-2.5 px-3 py-2'
-                  } rounded-xl text-[13.5px] leading-5 transition-all duration-150 group cursor-pointer ${
-                    isActive
-                      ? isCollapsedView
-                        ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white font-bold shadow-md shadow-blue-600/30 border border-blue-400/30'
-                        : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white font-bold shadow-md shadow-blue-600/25 border border-blue-500/30'
-                      : 'text-slate-700 font-semibold hover:bg-slate-100 hover:text-slate-900'
-                  }`}
-                >
-                  <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={isCollapsedView ? item.name : undefined}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`relative flex items-center ${
+                      isCollapsedView
+                        ? 'justify-center p-2.5'
+                        : 'gap-2.5 px-3 py-2'
+                    } rounded-xl text-[13.5px] leading-5 transition-all duration-150 group cursor-pointer ${
                       isActive
-                        ? 'bg-white/20 text-white'
-                        : 'text-slate-600 group-hover:text-blue-600 group-hover:bg-blue-50'
+                        ? isCollapsedView
+                          ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white font-bold shadow-md shadow-blue-600/30 border border-blue-400/30'
+                          : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white font-bold shadow-md shadow-blue-600/25 border border-blue-500/30'
+                        : 'text-slate-700 font-semibold hover:bg-slate-100 hover:text-slate-900'
                     }`}
                   >
-                    <Icon
-                      size={17}
-                      strokeWidth={isActive ? 2.2 : 2}
-                      aria-hidden="true"
-                      className="shrink-0"
-                    />
-                  </div>
-                  {!isCollapsedView && <span className="truncate">{item.name}</span>}
-                </Link>
-              );
-            })}
-        </div>
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : 'text-slate-600 group-hover:text-blue-600 group-hover:bg-blue-50'
+                      }`}
+                    >
+                      <Icon
+                        size={17}
+                        strokeWidth={isActive ? 2.2 : 2}
+                        aria-hidden="true"
+                        className="shrink-0"
+                      />
+                    </div>
+                    {!isCollapsedView && <span className="truncate">{item.name}</span>}
+                  </Link>
+                );
+              })}
+          </div>
+        )}
       </nav>
 
       {/* Authenticated Administrator Footer */}

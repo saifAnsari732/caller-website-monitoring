@@ -215,15 +215,15 @@ export default function Header({ title, subtitle }) {
             aria-haspopup="menu"
             className="flex items-center gap-2 py-1 px-1.5 rounded-xl hover:bg-slate-50 transition-colors"
           >
-            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white text-xs font-bold flex items-center justify-center shrink-0">
+            <div className={`w-8 h-8 rounded-lg ${user?.role === 'team_leader' ? 'bg-purple-700' : user?.role === 'telecaller' ? 'bg-emerald-700' : 'bg-slate-900'} text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-xs`}>
               {getInitials(user?.name)}
             </div>
             <div className="hidden xl:block text-left">
               <p className="text-[12.5px] font-semibold text-slate-900 leading-tight max-w-[128px] truncate">
-                {user?.name || 'Administrator'}
+                {user?.name || 'User'}
               </p>
-              <p className="text-[11px] text-blue-600 font-medium leading-tight">
-                Administrator
+              <p className={`text-[11px] font-bold leading-tight ${user?.role === 'team_leader' ? 'text-purple-600' : user?.role === 'telecaller' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                {user?.role === 'team_leader' ? 'Team Leader' : user?.role === 'telecaller' ? 'Telecaller' : 'Administrator'}
               </p>
             </div>
             <ChevronDown size={14} className="text-slate-400 hidden sm:block" aria-hidden="true" />
@@ -232,21 +232,32 @@ export default function Header({ title, subtitle }) {
           {profileMenuOpen && (
             <div
               role="menu"
-              className="absolute right-0 mt-2 w-60 rounded-2xl bg-white border border-slate-200 shadow-lg py-2 z-50"
+              className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-50 animate-in zoom-in-95 duration-100"
             >
               <div className="px-4 py-2.5 border-b border-slate-100">
                 <p className="text-sm font-semibold text-slate-900 truncate">
-                  {user?.name || 'CRM Administrator'}
+                  {user?.name || 'CRM User'}
                 </p>
                 <p className="text-xs text-slate-500 truncate mt-0.5">
                   {user?.email || user?.mobile || ''}
                 </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700">
-                    Administrator
+                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
+                    user?.role === 'team_leader'
+                      ? 'bg-purple-100 text-purple-800'
+                      : user?.role === 'telecaller'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {user?.role === 'team_leader' ? 'Team Leader' : user?.role === 'telecaller' ? 'Telecaller' : 'Administrator'}
                   </span>
+                  {user?.team && (
+                    <span className="text-[10.5px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md font-medium truncate max-w-[130px]">
+                      {user.team}
+                    </span>
+                  )}
                   {user?.employee_id && (
-                    <span className="text-[11px] font-mono text-slate-500">
+                    <span className="text-[10px] font-mono text-slate-400">
                       {user.employee_id}
                     </span>
                   )}

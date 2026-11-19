@@ -3,19 +3,32 @@ import connectDB from '../../../lib/db';
 import User from '../../../lib/models/User';
 import Lead from '../../../lib/models/Lead';
 import Call from '../../../lib/models/Call';
-import { hashPassword, requireAdminApi } from '../../../lib/auth';
+import { hashPassword, requireUserApi, requireAdminApi } from '../../../lib/auth';
 import { purgeDashboardCache } from '../../../lib/cache';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
-    if (!(await requireAdminApi(request))) {
-      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    const userPayload = await requireUserApi(request);
+    if (!userPayload) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+    if (userPayload.role === 'telecaller') {
+      return NextResponse.json({ error: 'Forbidden: Team Leader or Admin access required' }, { status: 403 });
     }
     await connectDB();
 
-    const callers = await User.find({ role: 'telecaller' }).select('-password').sort({ createdAt: 1 }).lean();
+    let query = { role: 'telecaller' };
+    if (userPayload.role === 'team_leader' || userPayload.role === 'manager') {
+      const tlDoc = await User.findById(userPayload.id).lean();
+      query.$or = [
+        { team_leader_id: userPayload.id },
+        { team: tlDoc?.team || 'Delhi NCR Sales Team' }
+      ];
+    }
+
+    const callers = await User.find(query).select('-password').sort({ createdAt: 1 }).lean();
 
     const enriched = await Promise.all(
       callers.map(async (tc) => {
@@ -112,16 +125,20 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const adminPayload = await requireAdminApi(request);
+    if (!adminPayload) {
+      return NextResponse.json({ error: 'Permission denied: Only Administrators can create new accounts.' }, { status: 403 });
+    }
     await connectDB();
     const body = await request.json();
-    const { name, mobile, email, team, targetCalls, targetConversions, password } = body;
+    const { name, mobile, email, team, targetCalls, targetConversions, password, role } = body;
 
     if (!name || !mobile || !password) {
       return NextResponse.json({ error: 'Name, mobile, and password are required' }, { status: 400 });
     }
 
     const count = await User.countDocuments();
-    const employee_id = body.employee_id || `EMP${100 + count + 1}`;
+    const employee_id = body.employee_id || (role === 'team_leader' ? `TL-${count + 1}` : `EMP${100 + count + 1}`);
     const cleanEmail = (email || '').trim() || `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}${count + 1}@kisanindia.com`;
 
     const hashedPassword = await hashPassword(password);
@@ -132,8 +149,8 @@ export async function POST(request) {
       email: cleanEmail,
       employee_id,
       password: hashedPassword,
-      role: 'telecaller',
-      team: team || 'North Region Sales',
+      role: ['admin', 'team_leader', 'telecaller'].includes(role) ? role : 'telecaller',
+      team: team || 'Delhi NCR Sales Team',
       status: 'active',
       on_leave: false,
       shift_status: 'Clocked In',
@@ -151,11 +168,23 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   try {
+    const userPayload = await requireUserApi(request);
+    if (!userPayload || userPayload.role === 'telecaller') {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     await connectDB();
     const body = await request.json();
     const { id, status, on_leave, shift_status, daily_call_target, daily_conversion_target, team } = body;
 
     if (!id) return NextResponse.json({ error: 'Telecaller ID required' }, { status: 400 });
+
+    // If Team Leader, verify the target agent is in their team
+    if (userPayload.role === 'team_leader' || userPayload.role === 'manager') {
+      const targetUser = await User.findById(id).lean();
+      if (!targetUser || (targetUser.team_leader_id?.toString() !== userPayload.id && targetUser.team !== userPayload.team)) {
+        return NextResponse.json({ error: 'Permission denied: You can only manage telecallers in your assigned team.' }, { status: 403 });
+      }
+    }
 
     const update = {};
     if (status !== undefined) update.status = status;

@@ -3,7 +3,7 @@ import connectDB from '../../../lib/db';
 import User from '../../../lib/models/User';
 import Lead from '../../../lib/models/Lead';
 import Call from '../../../lib/models/Call';
-import { requireAdminApi } from '../../../lib/auth';
+import { requireUserApi } from '../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,17 +63,26 @@ function parseDateRange(range = '7d', customStart = null, customEnd = null) {
 
 export async function GET(request) {
   try {
-    if (!(await requireAdminApi(request))) {
-      return NextResponse.json({ error: 'Administrator authentication required' }, { status: 401 });
+    const userPayload = await requireUserApi(request);
+    if (!userPayload) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
     await connectDB();
 
     const { searchParams } = new URL(request.url);
     const range = searchParams.get('range') || '7d';
-    const teamFilter = searchParams.get('team') || 'ALL';
-    const callerFilter = searchParams.get('callerId') || '';
+    let teamFilter = searchParams.get('team') || 'ALL';
+    let callerFilter = searchParams.get('callerId') || '';
     const customStart = searchParams.get('startDate');
     const customEnd = searchParams.get('endDate');
+
+    // Strict Role-Based Restrictions
+    if (userPayload.role === 'telecaller') {
+      callerFilter = userPayload.id;
+    } else if (userPayload.role === 'team_leader' || userPayload.role === 'manager') {
+      const tlDoc = await User.findById(userPayload.id).lean();
+      if (tlDoc?.team) teamFilter = tlDoc.team;
+    }
 
     const { start: startDate, end: endDate } = parseDateRange(range, customStart, customEnd);
 
@@ -81,6 +90,13 @@ export async function GET(request) {
     const userQuery = { role: 'telecaller' };
     if (teamFilter !== 'ALL') userQuery.team = teamFilter;
     if (callerFilter) userQuery._id = callerFilter;
+
+    if (userPayload.role === 'team_leader' || userPayload.role === 'manager') {
+      userQuery.$or = [
+        { team_leader_id: userPayload.id },
+        { team: teamFilter }
+      ];
+    }
 
     const telecallers = await User.find(userQuery).select('-password').sort({ createdAt: 1 }).lean();
     const telecallerIds = telecallers.map(tc => tc._id);

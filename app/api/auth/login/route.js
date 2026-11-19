@@ -51,12 +51,12 @@ export async function POST(request) {
       );
     }
 
-    // STRICT ADMIN-ONLY WEB PORTAL ENFORCEMENT (Telecallers use the Mobile App)
-    if (user.role !== 'admin') {
+    // Role verification (Admin, Team Leader, Telecaller)
+    const allowedRoles = ['admin', 'team_leader', 'manager', 'telecaller'];
+    if (!allowedRoles.includes(user.role)) {
       return NextResponse.json(
         {
-          error:
-            'Access Restricted: This Web Monitoring Console is for Administrators only. Telecaller agents must sign in via the Kisan Connect Mobile App.'
+          error: 'Access Restricted: Unauthorized role.'
         },
         { status: 403 }
       );

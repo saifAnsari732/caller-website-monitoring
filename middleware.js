@@ -43,12 +43,13 @@ export async function middleware(request) {
     }
   }
 
-  const isAuthenticated = Boolean((payload && payload.id && payload.role === 'admin') || apiKey);
+  const isRoleValid = payload && payload.id && ['admin', 'team_leader', 'manager', 'telecaller'].includes(payload.role);
+  const isAuthenticated = Boolean(isRoleValid || apiKey);
   const isPublicPage = PUBLIC_PAGES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
 
-  // 4. If already authenticated admin visits /login or /register, redirect to dashboard /
+  // 4. If already authenticated user visits /login or /register, redirect to dashboard /
   if (isAuthenticated && isPublicPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
@@ -62,7 +63,7 @@ export async function middleware(request) {
       return NextResponse.next();
     }
     return NextResponse.json(
-      { error: 'Administrator authentication required' },
+      { error: 'Authentication required' },
       { status: 401 }
     );
   }
